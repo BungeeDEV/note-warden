@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 1.2.0
+
 ### Added
 * Notizzettel: Eigenes kleines Fenster ohne Titelleiste im Stil von Windows Sticky Notes, das neben dem Hauptfenster geöffnet bleibt. Es zeigt die Updates als Karten, darunter die Post-its, und bietet Suche, Editor, Aufgaben, Anheften („immer im Vordergrund“) und Schließen. Öffnen mit Strg+Umschalt+M, über die Seitenleiste, den Tray oder die Befehlspalette; beim nächsten Start öffnet es sich wieder, wenn es zuletzt offen war. Beide Fenster gleichen ihre Änderungen automatisch ab.
 * Post-its: Kleine farbige Notizen zum Sortieren per Drag & Drop, Farbwechsel, Löschen mit Rückgängig und eigener Ansicht „Post-its“ in der Seitenleiste.
