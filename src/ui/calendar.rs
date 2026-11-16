@@ -13,6 +13,13 @@ struct Entry {
     progress: (usize, usize),
 }
 
+fn month_row_height(limit: usize) -> Pixels {
+    // Reserve the date header, configured pills and the "more" action. The
+    // calendar already scrolls vertically when six weeks cannot fit the window.
+    px(2. * palette::SP_2 + palette::SP_1 * (limit + 1) as f32)
+        + palette::fs(22. * (limit + 1) as f32 + palette::CTL_SM)
+}
+
 impl Entry {
     fn item(&self) -> CalItem {
         match self.task_id {
@@ -111,6 +118,7 @@ impl NoteWarden {
             .id(SharedString::from(key.clone()))
             .relative()
             .w_full()
+            .flex_none()
             .min_h(px(if card_style { 44. } else { 22. }))
             .pl(px(8.))
             .pr(px(palette::SP_2))
@@ -311,7 +319,7 @@ impl NoteWarden {
             .group(group.clone())
             .flex_1()
             .min_w_0()
-            .min_h(px(96.))
+            .min_h(month_row_height(limit))
             .overflow_hidden()
             .p(px(palette::SP_2))
             .flex()
@@ -388,6 +396,8 @@ impl NoteWarden {
                 let entity = entity.clone();
                 d.child(
                     kit::surface(("more", key as usize), &p)
+                        .min_h(palette::fs(palette::CTL_SM))
+                        .flex_none()
                         .px(px(palette::SP_2))
                         .text_size(palette::fs(11.))
                         .text_color(p.text_secondary)
@@ -691,7 +701,9 @@ impl NoteWarden {
                     .role(Role::Group)
                     .on_click(|_, _, cx| cx.stop_propagation())
                     .w(px(320.))
-                    .max_h(px(420.))
+                    .h(px(420.))
+                    .max_h(relative(0.9))
+                    .overflow_hidden()
                     .p(px(palette::SP_4))
                     .flex()
                     .flex_col()
@@ -703,6 +715,7 @@ impl NoteWarden {
                     .shadow_lg()
                     .child(
                         div()
+                            .flex_none()
                             .font_weight(FontWeight::SEMIBOLD)
                             .pb(px(4.))
                             .child(dates::full_with_weekday(date, format)),
@@ -710,14 +723,26 @@ impl NoteWarden {
                     .when(entries.is_empty(), |d| {
                         d.child(text_secondary(&p, "Für diesen Tag ist nichts geplant."))
                     })
-                    .children(entries.iter().enumerate().map(|(i, e)| {
-                        self.pill(e, format!("more-pill-{i}"), &p, false, cx)
-                            .into_any_element()
-                    }))
+                    .child(
+                        div()
+                            .id("more-day-scroll")
+                            .flex_1()
+                            .min_h_0()
+                            .overflow_y_scrollbar()
+                            .pr(px(palette::SCROLL_GUTTER))
+                            .flex()
+                            .flex_col()
+                            .gap(px(palette::SP_2))
+                            .children(entries.iter().enumerate().map(|(i, e)| {
+                                self.pill(e, format!("more-pill-{i}"), &p, false, cx)
+                                    .into_any_element()
+                            })),
+                    )
                     .child({
                         let entity = cx.entity();
                         kit::button("more-add")
                             .outline()
+                            .flex_none()
                             .with_size(gpui_kit::component::Size::Small)
                             .h(px(palette::CTL_SM))
                             .icon(kit::icon(icons::ADD, palette::ICON_MD))
@@ -770,7 +795,11 @@ impl NoteWarden {
                 item("open", "Öffnen".into(), None).on_click(move |_, window, cx| {
                     e_open.update(cx, |app, cx| {
                         app.pill_menu = None;
-                        app.select_update(uid, window, cx)
+                        if uid == 0 {
+                            app.set_view(View::Inbox, cx);
+                        } else {
+                            app.select_update(uid, window, cx);
+                        }
                     })
                 }),
             )
@@ -1032,7 +1061,11 @@ impl NoteWarden {
                                 let week_first = start + Duration::days((week * 7) as i64);
                                 div()
                                     .flex_1()
-                                    .min_h(px(if month_mode { 96. } else { 280. }))
+                                    .min_h(if month_mode {
+                                        month_row_height(limit)
+                                    } else {
+                                        px(280.)
+                                    })
                                     .flex()
                                     .when(show_weeks, |d| {
                                         d.child(

@@ -369,7 +369,11 @@ impl NoteWarden {
             DueItem::Inbox(t) => (
                 t.title.clone(),
                 Some("Inbox".into()),
-                Status::Geplant,
+                if t.done {
+                    Status::Erledigt
+                } else {
+                    Status::Geplant
+                },
                 t.date,
                 DateTarget::Inbox(t.id),
                 None,

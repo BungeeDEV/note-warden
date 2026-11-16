@@ -159,6 +159,14 @@ impl NoteWarden {
     }
     pub fn board_view(&self, cx: &mut Context<Self>) -> Div {
         let p = palette::get(cx);
+        // A horizontally scrolling GPUI container measures intrinsic content width.
+        // Derive columns from the known viewport so long labels cannot widen them.
+        let column_width = ((self.content_width
+            - 2. * palette::SP_6
+            - palette::SCROLL_GUTTER
+            - 3. * palette::SP_4)
+            / Status::ALL.len() as f32)
+            .max(220.);
         let mut columns = div()
             .w_full()
             .flex()
@@ -180,8 +188,8 @@ impl NoteWarden {
                 .collect();
             let mut column = div()
                 .id(("board-column", status.order() as u64))
-                .flex_1()
-                .flex_basis(px(0.))
+                .w(px(column_width))
+                .flex_none()
                 .min_w(px(220.))
                 .flex()
                 .flex_col()

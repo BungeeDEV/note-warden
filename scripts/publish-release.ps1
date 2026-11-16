@@ -35,6 +35,19 @@ $notesPath = (Resolve-Path -LiteralPath (Join-Path $ArtifactDirectory 'release-n
 $repoJson = & gh repo view $GitHubRepository --json isPrivate
 if ($LASTEXITCODE -ne 0) { throw 'GitHub repository cannot be read.' }
 if (($repoJson | ConvertFrom-Json).isPrivate) { throw 'Anonymous in-app updates require a public release repository.' }
-& gh release create "v$version" @files --repo $GitHubRepository --draft --title "Note Warden $version" --notes-file $notesPath
-if ($LASTEXITCODE -ne 0) { throw 'Creating the draft release failed.' }
-Write-Host 'Draft release created. Review it on GitHub, then publish it to make the update available.'
+$commit = & git -C (Split-Path -Parent $PSScriptRoot) rev-parse HEAD
+if ($LASTEXITCODE -ne 0) { throw 'Cannot identify the source commit.' }
+$releaseList = & gh release list --repo $GitHubRepository --limit 100 --json tagName,isDraft
+if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect existing releases.' }
+$existing = $releaseList | ConvertFrom-Json | Where-Object { $_.tagName -eq "v$version" } | Select-Object -First 1
+if ($existing) {
+    if (-not $existing.isDraft) { throw 'This version is already published. Bump the version; published assets are never replaced.' }
+    & gh release upload "v$version" @files --repo $GitHubRepository --clobber
+    if ($LASTEXITCODE -ne 0) { throw 'Updating draft artifacts failed.' }
+    & gh release edit "v$version" --repo $GitHubRepository --target $commit --title "Note Warden $version" --notes-file $notesPath
+    if ($LASTEXITCODE -ne 0) { throw 'Updating draft metadata failed.' }
+} else {
+    & gh release create "v$version" @files --repo $GitHubRepository --draft --target $commit --title "Note Warden $version" --notes-file $notesPath
+    if ($LASTEXITCODE -ne 0) { throw 'Creating the draft release failed.' }
+}
+Write-Host 'Draft release ready. Review it on GitHub, then publish it to make the update available.'

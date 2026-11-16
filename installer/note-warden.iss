@@ -49,6 +49,7 @@ Name: "desktopicon"; Description: "Verknüpfung auf dem Desktop anlegen"; Flags:
 [Files]
 Source: "{#AppBinary}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#AppRuntime}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "LICENSE-LUCIDE.txt"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\Note Warden"; Filename: "{app}\note-warden.exe"

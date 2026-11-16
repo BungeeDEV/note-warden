@@ -91,7 +91,15 @@ try {
     $installerName = "NoteWarden-$version-setup.exe"
     $installer = Join-Path $outputDir $installerName
     if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) { throw 'Compiler did not produce the expected installer.' }
-    if ((Get-Item -LiteralPath $installer).VersionInfo.ProductVersion -ne $version) { throw 'Installer version mismatch.' }
+    $resourceVersion = (Get-Item -LiteralPath $installer).VersionInfo
+    $expectedVersion = [Version]$version
+    Write-Host ("Installer resource version: " + $resourceVersion.ProductVersion)
+    if ($resourceVersion.ProductMajorPart -ne $expectedVersion.Major -or
+        $resourceVersion.ProductMinorPart -ne $expectedVersion.Minor -or
+        $resourceVersion.ProductBuildPart -ne $expectedVersion.Build -or
+        $resourceVersion.ProductPrivatePart -ne 0) {
+        throw ('Installer version mismatch: ' + $resourceVersion.ProductVersion)
+    }
     $utf8 = [Text.UTF8Encoding]::new($false)
     $changelog = [IO.File]::ReadAllText((Join-Path $repoRoot 'CHANGELOG.md'))
     $section = [regex]::Match($changelog, '(?ms)^## ' + [regex]::Escape($version) + '\r?\n.*?(?=^## |\z)')
