@@ -540,6 +540,13 @@ impl NoteWarden {
         match event {
             Event::ShowWindow => crate::system::show_main_window(),
             Event::QuickCapture => {
+                if let Some((handle, popup)) = self.popup_win.clone() {
+                    let _ = handle.update(cx, |_, window, cx| {
+                        window.activate_window();
+                        popup.update(cx, |popup, cx| popup.create_compact_note(window, cx));
+                    });
+                    return;
+                }
                 crate::system::show_main_window();
                 self.set_view(View::Today, cx);
                 self.focus_quick_add(window, cx);
@@ -548,6 +555,7 @@ impl NoteWarden {
                 crate::system::show_main_window();
                 self.show_today(window, cx);
             }
+            Event::Compact => self.open_popup(window, cx),
             Event::Quit => {
                 self.quitting = true;
                 cx.quit();

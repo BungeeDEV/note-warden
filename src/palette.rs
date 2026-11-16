@@ -394,6 +394,36 @@ pub fn project_color(project: &crate::model::Project, p: &Palette) -> Hsla {
     fit(c(base), p.bg_hover, 3., p.dark)
 }
 
+/// Post-it colors: (name, dark-theme fill, light-theme fill). Text keeps the theme's primary color.
+pub const STICKY_COLORS: [(&str, u32, u32); 5] = [
+    ("Gelb", 0x4A4222, 0xFFF1B0),
+    ("Mint", 0x24402F, 0xCDEFDA),
+    ("Blau", 0x213E52, 0xCBE5F8),
+    ("Rosa", 0x4C2B36, 0xF8D0DA),
+    ("Lila", 0x38305A, 0xE0D5F6),
+];
+
+const TAG_HUES: [u32; 6] = [0x38BDF8, 0xA78BFA, 0xFBBF24, 0x34D399, 0xF472B6, 0x2DD4BF];
+
+/// Stable color per tag name (case-insensitive), adjusted to stay readable on hover surfaces.
+pub fn tag_color(tag: &str, p: &Palette) -> Hsla {
+    let hash = tag
+        .to_lowercase()
+        .bytes()
+        .fold(5381u32, |h, b| h.wrapping_mul(33) ^ u32::from(b));
+    fit(
+        c(TAG_HUES[hash as usize % TAG_HUES.len()]),
+        p.bg_hover,
+        3.,
+        p.dark,
+    )
+}
+
+pub fn sticky_fill(dark: bool, color: u8) -> Hsla {
+    let (_, d, l) = STICKY_COLORS[color as usize % STICKY_COLORS.len()];
+    c(if dark { d } else { l })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -660,6 +660,7 @@ mod tests {
 
     fn sample() -> Update {
         let task = |id, title: &str, kind, sub| Task {
+            tags: Vec::new(),
             priority: 0,
             id,
             title: title.into(),
@@ -671,6 +672,7 @@ mod tests {
             remind: Default::default(),
         };
         Update {
+            tags: Vec::new(),
             version: String::new(),
             created_at: 0,
             activity: Vec::new(),

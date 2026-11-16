@@ -4229,6 +4229,7 @@ dependencies = [
  "global-hotkey",
  "gpui-kit",
  "minisign-verify",
+ "raw-window-handle",
  "serde",
  "serde_json",
  "tauri-winrt-notification",

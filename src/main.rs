@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod compact;
 mod dates;
 mod log;
 mod logo;
@@ -31,6 +32,7 @@ actions!(
         PreviousUpdate,
         NextUpdate,
         ToggleFocusMode,
+        ToggleCompactMode,
         ToggleStyleguide,
         NewUpdate,
         FocusSearch,
@@ -86,6 +88,7 @@ pub enum View {
     Board,
     Inbox,
     Releases,
+    Stickies,
 }
 
 #[derive(Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -290,6 +293,8 @@ pub enum Undo {
     Update(Box<model::Update>),
     /// Notiztext vor einer Wiederherstellung aus dem Versionsverlauf.
     Notes(u64, String),
+    /// Gelöschtes Post-it samt Position.
+    Sticky(usize, model::Sticky),
 }
 
 pub struct Toast {
@@ -344,7 +349,30 @@ pub enum CalMode {
     Week,
 }
 
+/// Everything the popup instance takes over from the main window.
+pub struct PopupInit {
+    pub workspace: Workspace,
+    pub writable: bool,
+    pub main: WeakEntity<NoteWarden>,
+    pub main_window: AnyWindowHandle,
+}
+
 pub struct NoteWarden {
+    pub sticky_input: Entity<TextareaState>,
+    pub tag_input: Entity<InputState>,
+    pub editing_sticky: Option<u64>,
+    /// Only post-its with this tag are shown (not saved).
+    pub sticky_tag: Option<String>,
+    pub compact_list: bool,
+    pub compact_preview: bool,
+    /// This instance renders the "Notizzettel" popup window instead of the main window.
+    pub popup: bool,
+    /// The other window's instance; both stay in sync through `adopt_workspace`.
+    pub peer: Option<(WeakEntity<NoteWarden>, AnyWindowHandle)>,
+    /// Main window only: the open popup.
+    pub popup_win: Option<(AnyWindowHandle, Entity<NoteWarden>)>,
+    /// Unsynced local changes that still have to reach the other window.
+    pub peer_dirty: bool,
     pub keyboard_menu: Option<(u64, usize)>,
     pub keyboard_index: usize,
     pub search_gen: u64,
@@ -484,11 +512,24 @@ pub struct NoteWarden {
 impl NoteWarden {
     fn new(
         window: &mut Window,
-        events: futures::channel::mpsc::UnboundedReceiver<system::Event>,
+        events: Option<futures::channel::mpsc::UnboundedReceiver<system::Event>>,
+        popup_of: Option<PopupInit>,
         cx: &mut Context<Self>,
     ) -> Self {
         let path = storage::data_path();
-        let (mut workspace, writable, error, recovered, migrated, restore_notice) =
+        let (mut workspace, writable, error, recovered, migrated, restore_notice) = if let Some(
+            init,
+        ) = &popup_of
+        {
+            (
+                init.workspace.clone(),
+                init.writable,
+                None,
+                false,
+                false,
+                None,
+            )
+        } else {
             match storage::load(&path) {
                 Ok(loaded) => (
                     loaded.workspace,
@@ -508,12 +549,20 @@ impl NoteWarden {
                     false,
                     None,
                 ),
-            };
-        if !writable {
+            }
+        };
+        if popup_of.is_some() {
+        } else if !writable {
             workspace.migrate();
         } else {
             let ids = workspace.updates.iter().map(|u| u.id).collect();
             storage::prune_history(&path, &ids);
+        }
+        if !workspace.settings.remember_window {
+            workspace.settings.compact.enabled = false;
+        }
+        if std::env::args().any(|arg| arg == "--compact") {
+            workspace.settings.compact.enabled = true;
         }
         let selected_update = workspace
             .updates
@@ -525,14 +574,14 @@ impl NoteWarden {
         let title_input = cx.new(|cx| {
             TextareaState::new(window, cx)
                 .auto_grow(1, 100)
-                .placeholder("Titel des Updates")
+                .placeholder("Titel")
         });
         let notes_input = cx.new(|cx| {
             TextareaState::new(window, cx)
                 .auto_grow(7, 10000)
                 .placeholder("Notizen in Markdown …")
         });
-        let search_input = cx.new(|cx| InputState::new(window, cx).placeholder("Updates suchen …"));
+        let search_input = cx.new(|cx| InputState::new(window, cx).placeholder("Suchen …"));
         let task_input =
             cx.new(|cx| InputState::new(window, cx).placeholder("Aufgabe hinzufügen …"));
         let task_edit_input = cx.new(|cx| InputState::new(window, cx));
@@ -773,7 +822,44 @@ impl NoteWarden {
                 .auto_grow(8, 16)
                 .placeholder("Changelog")
         });
+        let sticky_input = cx.new(|cx| {
+            TextareaState::new(window, cx)
+                .auto_grow(2, 8)
+                .placeholder("Notiz …")
+        });
+        let sticky_sub =
+            cx.subscribe(
+                &sticky_input,
+                |this, input, event: &InputEvent, cx| match event {
+                    InputEvent::Change => {
+                        let value = input.read(cx).value().to_string();
+                        this.set_sticky_text(&value, cx);
+                    }
+                    InputEvent::Blur => this.finish_sticky_edit(cx),
+                    _ => {}
+                },
+            );
+        let tag_input = cx.new(|cx| InputState::new(window, cx).placeholder("+ Tag"));
+        let tag_sub = cx.subscribe_in(
+            &tag_input,
+            window,
+            |this, _, event: &InputEvent, window, cx| {
+                if matches!(event, InputEvent::PressEnter { .. }) {
+                    this.commit_tag_input(window, cx);
+                }
+            },
+        );
         let mut app = Self {
+            tag_input,
+            sticky_input,
+            editing_sticky: None,
+            sticky_tag: None,
+            compact_list: true,
+            compact_preview: false,
+            popup: popup_of.is_some(),
+            peer: popup_of.as_ref().map(|i| (i.main.clone(), i.main_window)),
+            popup_win: None,
+            peer_dirty: false,
             keyboard_menu: None,
             keyboard_index: 0,
             search_gen: 0,
@@ -797,7 +883,7 @@ impl NoteWarden {
             writable,
             error,
             recovered,
-            events: Some(events),
+            events,
             remind_custom: false,
             update_state: Default::default(),
             update_dismissed: false,
@@ -831,7 +917,11 @@ impl NoteWarden {
             settings_cat,
             settings_saved_at: None,
             tpl_edit: None,
-            splash: Splash::Showing,
+            splash: if popup_of.is_some() {
+                Splash::Gone
+            } else {
+                Splash::Showing
+            },
             splash_start: Instant::now(),
             #[cfg(debug_assertions)]
             styleguide_open: false,
@@ -924,9 +1014,20 @@ impl NoteWarden {
             app.flush();
         }
         app.apply_startup_settings();
-        app.start_backups(cx);
-        app.start_system(window, cx);
-        app.start_splash(cx);
+        if app.popup {
+            app.start_popup(window, cx);
+        } else {
+            app.start_backups(cx);
+            app.start_system(window, cx);
+            app.start_splash(cx);
+            let reopen = app.workspace.settings.compact.enabled
+                || std::env::args().any(|arg| arg == "--compact");
+            if reopen {
+                cx.defer_in(window, |this, window, cx| this.open_popup(window, cx));
+            }
+        }
+        app._subscriptions.push(sticky_sub);
+        app._subscriptions.push(tag_sub);
         app._subscriptions.push(version_sub);
         app._subscriptions.push(remind_sub);
         app.sort = app.workspace.settings.updates_ui.sort;
@@ -936,6 +1037,23 @@ impl NoteWarden {
         app.sync_fields(window, cx);
         app.focus_handle.focus(window, cx);
         app
+    }
+
+    /// Leaves a view whose sidebar entry was just turned off.
+    fn ensure_view_visible(&mut self) {
+        let st = &self.workspace.settings;
+        let hidden = match self.view {
+            View::Inbox => st.hide_inbox,
+            View::Board => st.hide_board,
+            View::Stickies => st.hide_stickies,
+            View::Releases => st.hide_releases,
+            View::Calendar => st.hide_calendar,
+            View::Today | View::Updates => false,
+        };
+        if hidden {
+            self.view = View::Today;
+            self.detail_open = false;
+        }
     }
 
     /// Startansicht, Kalender-Standard und gemerkte Layout-Werte aus den Einstellungen.
@@ -962,6 +1080,7 @@ impl NoteWarden {
                 }
             }
         }
+        self.ensure_view_visible();
     }
 
     /// Tray-Verhalten, Hotkey, Ereigniskanal und Erinnerungen.
@@ -988,6 +1107,9 @@ impl NoteWarden {
                 });
                 if hide {
                     system::hide_main_window();
+                } else if entity.read(cx).popup_win.is_some() {
+                    // The popup alone must not keep the app alive without its main window.
+                    cx.quit();
                 }
                 !hide
             }
@@ -1059,7 +1181,15 @@ impl NoteWarden {
     pub fn check_updates(&mut self, manual: bool, cx: &mut Context<Self>) {
         if !updater::configured() {
             if manual {
-                self.toast("Automatische Updates sind nicht eingerichtet", None, cx);
+                self.toast(
+                    if storage::is_portable() {
+                        "Portabler Modus: neue Version bitte manuell herunterladen"
+                    } else {
+                        "Automatische Updates sind nicht eingerichtet"
+                    },
+                    None,
+                    cx,
+                );
             }
             return;
         }
@@ -1212,6 +1342,12 @@ impl NoteWarden {
 
     /// Vormerken; geschrieben wird nach kurzer Ruhe (Debounce ~400 ms).
     pub fn persist(&mut self, cx: &mut Context<Self>) {
+        self.peer_dirty = true;
+        self.persist_local(cx);
+    }
+
+    /// Schedules the autosave without telling the other window (used when adopting its data).
+    fn persist_local(&mut self, cx: &mut Context<Self>) {
         if !self.writable {
             return;
         }
@@ -1229,6 +1365,7 @@ impl NoteWarden {
             this.update(cx, |this, cx| {
                 if this.save_gen == generation {
                     this.flush();
+                    this.sync_peer(cx);
                     cx.notify();
                 }
             })
@@ -1243,6 +1380,12 @@ impl NoteWarden {
     }
 
     pub fn flush(&mut self) {
+        if self.popup {
+            // Only the main window owns the file; the popup hands its data over instead.
+            self.dirty = false;
+            self.saved_at = Some(Instant::now());
+            return;
+        }
         if self.writable && self.dirty {
             match storage::save(&self.path, &self.workspace) {
                 Ok(()) => {
@@ -1286,6 +1429,9 @@ impl NoteWarden {
     }
 
     pub fn set_notes(&mut self, value: String, cx: &mut Context<Self>) {
+        if !self.writable {
+            return;
+        }
         if let Some(update) = self
             .selected_update
             .and_then(|id| self.workspace.update_mut(id))
@@ -1319,6 +1465,9 @@ impl NoteWarden {
         );
         self.detail_tab = 0;
         if self.workspace.update(id).is_some() {
+            if self.popup {
+                self.compact_list = false;
+            }
             self.selected_update = Some(id);
             if self.workspace.settings.last_update != Some(id) {
                 self.workspace.settings.last_update = Some(id);
@@ -1372,6 +1521,10 @@ impl NoteWarden {
         cx: &mut Context<Self>,
     ) {
         if !self.writable {
+            return;
+        }
+        if self.popup {
+            self.create_compact_note(window, cx);
             return;
         }
         let template = template
@@ -1511,6 +1664,7 @@ impl NoteWarden {
                     .trim_start_matches("[ ]")
                     .trim();
                 let (kind, clean) = quick::task_kind(line);
+                let (clean, tags) = quick::split_tags(&clean);
                 let parsed =
                     quick::parse_quick_input(&clean, model::today(), &self.workspace.projects);
                 if let Some(tid) = self.workspace.new_task(id, parsed.title, parsed.date)
@@ -1519,6 +1673,7 @@ impl NoteWarden {
                 {
                     t.kind = kind;
                     t.priority = parsed.priority;
+                    t.tags = tags;
                 }
             }
             self.persist(cx);
@@ -2012,6 +2167,10 @@ impl NoteWarden {
                     self.sync_fields(window, cx);
                 }
             }
+            Some(Undo::Sticky(index, sticky)) => {
+                let at = index.min(self.workspace.stickies.len());
+                self.workspace.stickies.insert(at, sticky);
+            }
             Some(Undo::Update(previous)) => {
                 if let Some(update) = self
                     .workspace
@@ -2144,6 +2303,27 @@ impl NoteWarden {
     // ---------- Overlays ----------
 
     pub fn close_overlay(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.editing_sticky.is_some() {
+            self.finish_sticky_edit(cx);
+            self.focus_handle.focus(window, cx);
+            return;
+        }
+        if self.popup
+            && !self.compact_list
+            && self.dialog.is_none()
+            && self.date_pop.is_none()
+            && !self.palette_open
+            && self.history_panel.is_none()
+            && self.editing_task.is_none()
+            && self.keyboard_menu.is_none()
+        {
+            self.snapshot_pending();
+            self.discard_untouched_drafts(None, cx);
+            self.compact_list = true;
+            self.focus_handle.focus(window, cx);
+            cx.notify();
+            return;
+        }
         if self.keyboard_menu.take().is_some() {
             self.focus_handle.focus(window, cx);
             cx.notify();
@@ -2217,6 +2397,12 @@ impl NoteWarden {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        if self.popup {
+            self.forward_to_main(cx, move |main, window, cx| {
+                main.open_settings(cat, window, cx)
+            });
+            return;
+        }
         if let Some(cat) = cat {
             self.settings_cat = cat;
         }
@@ -2239,6 +2425,7 @@ impl NoteWarden {
         f: impl FnOnce(&mut model::Settings),
     ) {
         f(&mut self.workspace.settings);
+        self.ensure_view_visible();
         self.schedule_reminders(cx);
         self.applied_look = None;
         self.settings_saved_at = Some(Instant::now());
@@ -2254,6 +2441,12 @@ impl NoteWarden {
     }
 
     pub fn open_dialog(&mut self, dialog: Dialog, window: &mut Window, cx: &mut Context<Self>) {
+        if self.popup {
+            self.forward_to_main(cx, move |main, window, cx| {
+                main.open_dialog(dialog, window, cx)
+            });
+            return;
+        }
         self.dialog = Some(dialog);
         self.date_pop = None;
         self.palette_open = false;
@@ -2262,6 +2455,13 @@ impl NoteWarden {
     }
 
     pub fn focus_search(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.popup {
+            self.compact_list = true;
+            self.search_input
+                .update(cx, |input, cx| input.focus(window, cx));
+            cx.notify();
+            return;
+        }
         self.set_view(View::Updates, cx);
         self.search_input
             .update(cx, |input, cx| input.focus(window, cx));
@@ -2560,6 +2760,10 @@ gpui_kit::assets::icon_assets!(
         Download,
         Monitor,
         Flag,
+        Pin,
+        Minimize2,
+        Maximize2,
+        StickyNote,
     ]
 );
 
@@ -2659,6 +2863,7 @@ fn main() {
             KeyBinding::new("ctrl-b", EditorBold, Some("Editor")),
             KeyBinding::new("ctrl-i", EditorItalic, Some("Editor")),
             KeyBinding::new("ctrl-shift-d", ToggleStyleguide, None),
+            KeyBinding::new("ctrl-shift-m", ToggleCompactMode, None),
             KeyBinding::new("ctrl-shift-k", EditorLink, Some("Editor")),
             KeyBinding::new("tab", TaskIndent, Some("TaskRow")),
             KeyBinding::new("shift-tab", TaskOutdent, Some("TaskRow")),
@@ -2703,11 +2908,11 @@ fn main() {
                     title: Some("Note Warden".into()),
                     ..Default::default()
                 }),
-                window_min_size: Some(size(px(960.), px(620.))),
+                window_min_size: Some(size(px(compact::MIN_SIZE.0), px(compact::MIN_SIZE.1))),
                 ..Default::default()
             },
             cx,
-            |window, cx| cx.new(|cx| NoteWarden::new(window, events, cx)),
+            |window, cx| cx.new(|cx| NoteWarden::new(window, Some(events), None, cx)),
         )
         .expect("Fenster konnte nicht geöffnet werden");
     });

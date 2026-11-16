@@ -51,11 +51,13 @@ pub enum PaletteAction {
     GoBoard,
     ToggleTheme,
     ToggleSidebar,
+    ToggleCompact,
     ExportBackup,
     ImportBackup,
     Settings,
     Shortcuts,
     GoReleases,
+    GoStickies,
     Publish,
     BackupNow,
     CheckUpdates,
@@ -84,6 +86,11 @@ impl NoteWarden {
         }
         let mut items = vec![
             command("Neues Update", "Strg+N", PaletteAction::NewUpdate),
+            command(
+                "Notizzettel öffnen",
+                "Strg+Umschalt+M",
+                PaletteAction::ToggleCompact,
+            ),
             command("Zur Heute-Ansicht", "Strg+1", PaletteAction::GoToday),
             command("Zu den Updates", "Strg+2", PaletteAction::GoUpdates),
             command("Zur Inbox", "", PaletteAction::GoInbox),
@@ -100,6 +107,7 @@ impl NoteWarden {
                 PaletteAction::ToggleSidebar,
             ),
             command("Gehe zu Releases", "", PaletteAction::GoReleases),
+            command("Gehe zu Post-its", "", PaletteAction::GoStickies),
             command("Jetzt sichern", "Backup", PaletteAction::BackupNow),
             command("Nach Updates suchen", "", PaletteAction::CheckUpdates),
             command("Backup exportieren", "JSON", PaletteAction::ExportBackup),
@@ -150,6 +158,7 @@ impl NoteWarden {
         self.palette_open = false;
         self.focus_handle.focus(window, cx);
         match item.action {
+            PaletteAction::ToggleCompact => self.toggle_popup(window, cx),
             PaletteAction::QuickAdd(text) => {
                 self.quick_input
                     .update(cx, |input, cx| input.set_value(text, window, cx));
@@ -169,6 +178,7 @@ impl NoteWarden {
             PaletteAction::Settings => self.open_settings(None, window, cx),
             PaletteAction::Shortcuts => self.open_dialog(Dialog::Shortcuts, window, cx),
             PaletteAction::GoReleases => self.set_view(View::Releases, cx),
+            PaletteAction::GoStickies => self.set_view(View::Stickies, cx),
             PaletteAction::Publish => {
                 if let Some(id) = self.selected_update {
                     self.open_publish(id, window, cx);

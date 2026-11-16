@@ -103,6 +103,10 @@ impl NoteWarden {
                 t.title.to_lowercase().contains(query)
                     || t.description.to_lowercase().contains(query)
             })
+            || update
+                .tags
+                .iter()
+                .any(|t| t.to_lowercase().contains(query.trim_start_matches('#')))
     }
 
     /// Gehört das Update zur Sidebar-Ansicht (ohne Suche und Filter aus dem Popover)?
@@ -134,6 +138,7 @@ impl NoteWarden {
                 self.project_filter
                     .is_none_or(|id| u.project_id == Some(id))
             })
+            .filter(|u| self.passes_tag_filter(u))
             .filter(|u| self.in_scope(u))
             .filter(|u| Self::matches_query(u, &query))
             .filter(|u| {
@@ -311,6 +316,15 @@ impl NoteWarden {
                     .into_any_element(),
             );
         }
+        for tag in update.tags.iter().take(3) {
+            meta.push(
+                div()
+                    .flex_none()
+                    .text_color(palette::tag_color(tag, p))
+                    .child(format!("#{tag}"))
+                    .into_any_element(),
+            );
+        }
         meta
     }
 
@@ -344,7 +358,10 @@ impl NoteWarden {
             );
         }
         let meta_line = kit::meta_line(&p, meta);
-        let has_meta = project.is_some() || total > 0 || update.planned_for.is_some();
+        let has_meta = project.is_some()
+            || total > 0
+            || update.planned_for.is_some()
+            || !update.tags.is_empty();
         let title = div()
             .min_w_0()
             .flex()
@@ -358,13 +375,14 @@ impl NoteWarden {
                     .text_size(palette::fs(palette::FS_MD))
                     .font_weight(FontWeight::MEDIUM)
                     .text_color(p.text_primary)
-                    .child(if update.title.trim().is_empty() {
-                        div()
+                    .child(match update.display_title() {
+                        Some(title) => {
+                            highlighted(&title, &self.search_query, &p).into_any_element()
+                        }
+                        None => div()
                             .text_color(p.text_tertiary)
                             .child("Ohne Titel")
-                            .into_any_element()
-                    } else {
-                        highlighted(&update.title, &self.search_query, &p).into_any_element()
+                            .into_any_element(),
                     }),
             )
             .when(update.priority > 0, |d| {
@@ -399,14 +417,18 @@ impl NoteWarden {
             } else {
                 gpui_kit::transparent_black()
             })
-            .accessibility_label(format!("{} · {}", update.title, update.status.label()))
+            .accessibility_label(format!(
+                "{} · {}",
+                update
+                    .display_title()
+                    .unwrap_or_else(|| "Ohne Titel".into()),
+                update.status.label()
+            ))
             .tooltip(tip({
                 let mut parts = vec![
-                    if update.title.trim().is_empty() {
-                        "Ohne Titel".to_owned()
-                    } else {
-                        update.title.clone()
-                    },
+                    update
+                        .display_title()
+                        .unwrap_or_else(|| "Ohne Titel".into()),
                     update.status.label().to_owned(),
                 ];
                 if let Some(project) = project {

@@ -38,7 +38,9 @@ pub enum State {
 pub type Shared = Arc<Mutex<State>>;
 
 pub fn configured() -> bool {
-    ENDPOINT.is_some_and(|endpoint| endpoint.starts_with("https://"))
+    // A portable copy must not be replaced by the installer; it is updated by hand.
+    !crate::storage::is_portable()
+        && ENDPOINT.is_some_and(|endpoint| endpoint.starts_with("https://"))
         && PUBLIC_KEY.is_some_and(|key| minisign_verify::PublicKey::from_base64(key.trim()).is_ok())
 }
 

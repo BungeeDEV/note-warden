@@ -228,6 +228,7 @@ pub const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
         "Allgemein",
         &[
             ("Strg+N", "Neues Update"),
+            ("Strg+Umschalt+M", "Notizzettel öffnen oder schließen"),
             ("Strg+K", "Befehlspalette"),
             ("Strg+,", "Einstellungen öffnen"),
             ("Strg+F", "Suche fokussieren"),
@@ -248,6 +249,7 @@ pub const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
             ("↑ / ↓ / J / K", "Update auswählen"),
             ("Enter", "Titel bearbeiten"),
             ("1 / 2 / 3 / 4", "Status setzen"),
+            ("Leertaste", "Update erledigt setzen oder wieder öffnen"),
             ("D", "Datum setzen"),
             ("Strg+D", "Update duplizieren"),
             ("Strg+Z", "Änderung rückgängig machen"),
@@ -1142,6 +1144,49 @@ impl NoteWarden {
                     ),
                 );
                 out.push(sec.build());
+
+                let mut sec = Section::new(&p, q, "Seitenleiste").navigation(
+                    entity.clone(),
+                    cat,
+                    self.settings_jump.as_deref(),
+                    &self.settings_target_focus,
+                );
+                sec.row(
+                    "Inbox",
+                    "Zeigt die Inbox in der Seitenleiste.",
+                    sw("sw-nav-inbox", !s.hide_inbox, "Inbox", |s| {
+                        s.hide_inbox = !s.hide_inbox
+                    }),
+                );
+                sec.row(
+                    "Board",
+                    "Zeigt das Kanban-Board in der Seitenleiste.",
+                    sw("sw-nav-board", !s.hide_board, "Board", |s| {
+                        s.hide_board = !s.hide_board
+                    }),
+                );
+                sec.row(
+                    "Post-its",
+                    "Zeigt die Post-its in der Seitenleiste. Im Notizzettel bleiben sie verfügbar.",
+                    sw("sw-nav-stickies", !s.hide_stickies, "Post-its", |s| {
+                        s.hide_stickies = !s.hide_stickies
+                    }),
+                );
+                sec.row(
+                    "Releases",
+                    "Zeigt die Releases in der Seitenleiste.",
+                    sw("sw-nav-releases", !s.hide_releases, "Releases", |s| {
+                        s.hide_releases = !s.hide_releases
+                    }),
+                );
+                sec.row(
+                    "Kalender",
+                    "Zeigt den Kalender in der Seitenleiste.",
+                    sw("sw-nav-calendar", !s.hide_calendar, "Kalender", |s| {
+                        s.hide_calendar = !s.hide_calendar
+                    }),
+                );
+                out.push(sec.build());
             }
 
             SettingsCat::Editor => {
@@ -1473,7 +1518,11 @@ impl NoteWarden {
                     &self.settings_target_focus,
                 );
                 sec.row_text(
-                    "Datenordner",
+                    if crate::storage::is_portable() {
+                        "Datenordner (portabel)"
+                    } else {
+                        "Datenordner"
+                    },
                     ellipsize_middle(&path_text, 52),
                     div()
                         .id("data-path")

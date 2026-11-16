@@ -125,12 +125,16 @@ pub struct Task {
     pub kind: ChangeKind,
     #[serde(default)]
     pub description: String,
+    #[serde(default)]
+    pub tags: Vec<String>,
     #[serde(default, flatten)]
     pub remind: Remind,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
 pub struct Update {
+    #[serde(default)]
+    pub tags: Vec<String>,
     #[serde(default)]
     pub version: String,
     #[serde(default)]
@@ -165,7 +169,63 @@ pub struct Update {
     pub remind: Remind,
 }
 
+/// Tag text as stored: no leading `#`, inner whitespace turned into `-`, at most 24 characters.
+pub fn clean_tag(raw: &str) -> Option<String> {
+    let tag: String = raw
+        .trim()
+        .trim_start_matches('#')
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join("-")
+        .chars()
+        .take(24)
+        .collect();
+    (!tag.is_empty()).then_some(tag)
+}
+
+/// Adds `raw` unless the same tag (ignoring case) is already there; true if it was added.
+pub fn push_tag(tags: &mut Vec<String>, raw: &str) -> bool {
+    let Some(tag) = clean_tag(raw) else {
+        return false;
+    };
+    if tags
+        .iter()
+        .any(|t| t.eq_ignore_ascii_case(&tag) || t.to_lowercase() == tag.to_lowercase())
+    {
+        return false;
+    }
+    tags.push(tag);
+    true
+}
+
 impl Update {
+    /// Tagged directly or through one of its tasks (ignoring case).
+    pub fn has_tag(&self, tag: &str) -> bool {
+        let tag = tag.to_lowercase();
+        self.tags
+            .iter()
+            .chain(self.tasks.iter().flat_map(|t| t.tags.iter()))
+            .any(|t| t.to_lowercase() == tag)
+    }
+
+    /// Titel oder, wenn leer, die erste Textzeile der Notiz (ohne Markdown-Präfix).
+    pub fn display_title(&self) -> Option<String> {
+        let title = self.title.trim();
+        if !title.is_empty() {
+            return Some(title.to_owned());
+        }
+        self.notes
+            .lines()
+            .find(|line| !line.trim().is_empty())
+            .map(|line| {
+                line.trim_start_matches(['#', '-', '*', ' '])
+                    .chars()
+                    .take(80)
+                    .collect::<String>()
+            })
+            .filter(|title| !title.is_empty())
+    }
+
     /// Fortschritt über alle Aufgaben inklusive Unteraufgaben.
     pub fn task_progress(&self) -> (usize, usize) {
         (
@@ -358,6 +418,8 @@ impl Accent {
 #[derive(Clone, Deserialize, Serialize)]
 pub struct Settings {
     #[serde(default)]
+    pub compact: crate::compact::CompactSettings,
+    #[serde(default)]
     pub updates_ui: UpdatesUi,
     // Allgemein
     #[serde(default)]
@@ -468,6 +530,19 @@ pub struct Settings {
     #[serde(default = "yes")]
     pub status_group_open: bool,
     #[serde(default = "yes")]
+    pub tags_group_open: bool,
+    /// Sidebar entries the user turned off (the views stay reachable from elsewhere).
+    #[serde(default)]
+    pub hide_inbox: bool,
+    #[serde(default)]
+    pub hide_board: bool,
+    #[serde(default)]
+    pub hide_stickies: bool,
+    #[serde(default)]
+    pub hide_releases: bool,
+    #[serde(default)]
+    pub hide_calendar: bool,
+    #[serde(default = "yes")]
     pub filter_group_open: bool,
     #[serde(default = "yes")]
     pub projects_group_open: bool,
@@ -562,7 +637,22 @@ pub struct StandaloneTask {
     pub remind: Remind,
 }
 
-#[derive(Default, Deserialize, Serialize)]
+/// Kleine Notiz ohne Titel und Status: Reihenfolge = Position in `Workspace::stickies`.
+#[derive(Clone, Default, Deserialize, Serialize)]
+pub struct Sticky {
+    pub id: u64,
+    #[serde(default)]
+    pub text: String,
+    /// Index in `palette::STICKY_COLORS`.
+    #[serde(default)]
+    pub color: u8,
+    #[serde(default)]
+    pub created_at: i64,
+    #[serde(default)]
+    pub tags: Vec<String>,
+}
+
+#[derive(Clone, Default, Deserialize, Serialize)]
 pub struct Workspace {
     #[serde(default)]
     pub projects: Vec<Project>,
@@ -572,6 +662,8 @@ pub struct Workspace {
     pub schema_version: u32,
     #[serde(default)]
     pub updates: Vec<Update>,
+    #[serde(default)]
+    pub stickies: Vec<Sticky>,
     #[serde(default = "first_id")]
     next_id: u64,
     #[serde(default)]
@@ -583,9 +675,87 @@ fn first_id() -> u64 {
 }
 
 impl Workspace {
+    /// Every tag in use by a live update or its tasks with the number of updates using it,
+    /// most used first. The spelling of the first occurrence wins.
+    pub fn all_tags(&self) -> Vec<(String, usize)> {
+        let mut counts: Vec<(String, usize)> = Vec::new();
+        for update in self.updates.iter().filter(|u| u.is_live()) {
+            let mut seen: Vec<String> = Vec::new();
+            for tag in update
+                .tags
+                .iter()
+                .chain(update.tasks.iter().flat_map(|t| t.tags.iter()))
+            {
+                let key = tag.to_lowercase();
+                if seen.contains(&key) {
+                    continue;
+                }
+                seen.push(key.clone());
+                match counts.iter_mut().find(|(t, _)| t.to_lowercase() == key) {
+                    Some((_, n)) => *n += 1,
+                    None => counts.push((tag.clone(), 1)),
+                }
+            }
+        }
+        counts.sort_by(|a, b| {
+            b.1.cmp(&a.1)
+                .then_with(|| a.0.to_lowercase().cmp(&b.0.to_lowercase()))
+        });
+        counts
+    }
+
+    /// Tags used by post-its with the number of post-its, most used first.
+    pub fn sticky_tags(&self) -> Vec<(String, usize)> {
+        let mut counts: Vec<(String, usize)> = Vec::new();
+        for tag in self.stickies.iter().flat_map(|s| s.tags.iter()) {
+            match counts
+                .iter_mut()
+                .find(|(t, _)| t.to_lowercase() == tag.to_lowercase())
+            {
+                Some((_, n)) => *n += 1,
+                None => counts.push((tag.clone(), 1)),
+            }
+        }
+        counts.sort_by(|a, b| {
+            b.1.cmp(&a.1)
+                .then_with(|| a.0.to_lowercase().cmp(&b.0.to_lowercase()))
+        });
+        counts
+    }
+
+    /// Neues Post-it ganz vorn; die Farbe wechselt reihum.
+    pub fn new_sticky(&mut self) -> u64 {
+        let id = self.next_id();
+        let color = (self.stickies.len() % crate::palette::STICKY_COLORS.len()) as u8;
+        self.stickies.insert(
+            0,
+            Sticky {
+                id,
+                text: String::new(),
+                color,
+                created_at: now_millis(),
+                tags: Vec::new(),
+            },
+        );
+        id
+    }
+
+    /// Verschiebt ein Post-it vor `before` (am Ende, wenn `None` oder unbekannt).
+    pub fn move_sticky(&mut self, id: u64, before: Option<u64>) {
+        let Some(from) = self.stickies.iter().position(|s| s.id == id) else {
+            return;
+        };
+        let sticky = self.stickies.remove(from);
+        let to = before
+            .and_then(|b| self.stickies.iter().position(|s| s.id == b))
+            .unwrap_or(self.stickies.len());
+        self.stickies.insert(to, sticky);
+    }
+
     pub fn new_update(&mut self, date: Option<NaiveDate>) -> u64 {
         let id = self.next_id();
         self.updates.push(Update {
+            tags: Vec::new(),
             version: String::new(),
             created_at: now_millis(),
             activity: Vec::new(),
@@ -640,6 +810,7 @@ impl Workspace {
             .iter_mut()
             .find(|update| update.id == update_id)?;
         update.tasks.push(Task {
+            tags: Vec::new(),
             priority: 0,
             id,
             title: title.to_owned(),
@@ -713,6 +884,7 @@ impl Workspace {
             .iter()
             .map(|p| p.id)
             .chain(self.standalone_tasks.iter().map(|t| t.id))
+            .chain(self.stickies.iter().map(|s| s.id))
             .fold(max_id, u64::max);
         self.next_id = self.next_id.max(max_id.saturating_add(1));
     }
@@ -818,6 +990,69 @@ mod tests {
     use super::*;
 
     #[test]
+    fn tags_are_cleaned_deduplicated_and_counted_across_updates_and_tasks() {
+        assert_eq!(clean_tag("  #Pre  Release "), Some("Pre-Release".into()));
+        assert_eq!(clean_tag("#"), None);
+        assert_eq!(clean_tag(&"x".repeat(40)).map(|t| t.len()), Some(24));
+        let mut tags = Vec::new();
+        assert!(push_tag(&mut tags, "#Bug"));
+        assert!(!push_tag(&mut tags, "bug"));
+        let mut ws = Workspace::default();
+        let (a, b) = (ws.new_update(None), ws.new_update(None));
+        ws.update_mut(a).unwrap().tags = vec!["Bug".into(), "api".into()];
+        let task = ws.new_task(b, "Fix".into(), None).unwrap();
+        ws.update_mut(b)
+            .unwrap()
+            .tasks
+            .iter_mut()
+            .find(|t| t.id == task)
+            .unwrap()
+            .tags = vec!["bug".into()];
+        assert!(ws.update(b).unwrap().has_tag("BUG"));
+        assert!(!ws.update(b).unwrap().has_tag("api"));
+        assert_eq!(ws.all_tags(), vec![("Bug".into(), 2), ("api".into(), 1)]);
+    }
+
+    #[test]
+    fn stickies_keep_order_ids_and_survive_old_files() {
+        let mut ws: Workspace = serde_json::from_str(r#"{"next_id":4}"#).unwrap();
+        assert!(ws.stickies.is_empty());
+        let (a, b, c) = (ws.new_sticky(), ws.new_sticky(), ws.new_sticky());
+        let ids = |ws: &Workspace| ws.stickies.iter().map(|s| s.id).collect::<Vec<_>>();
+        assert_eq!(ids(&ws), vec![c, b, a]);
+        ws.move_sticky(a, Some(c));
+        assert_eq!(ids(&ws), vec![a, c, b]);
+        ws.move_sticky(a, None);
+        assert_eq!(ids(&ws), vec![c, b, a]);
+        ws.move_sticky(99, Some(a));
+        assert_eq!(ids(&ws), vec![c, b, a]);
+        let mut restored: Workspace =
+            serde_json::from_str(&serde_json::to_string(&ws).unwrap()).unwrap();
+        restored.next_id = 1;
+        restored.repair_ids();
+        assert!(restored.new_sticky() > a.max(b).max(c));
+    }
+
+    #[test]
+    fn display_title_prefers_title_then_first_note_line() {
+        let mut ws = Workspace::default();
+        let id = ws.new_update(None);
+        let update = ws.update_mut(id).unwrap();
+        assert_eq!(update.display_title(), None);
+        update.notes = "
+## Einkauf planen
+- Milch"
+            .into();
+        assert_eq!(update.display_title().as_deref(), Some("Einkauf planen"));
+        update.notes = "- 
+"
+        .into();
+        assert_eq!(update.display_title(), None);
+        update.title = "  Release  ".into();
+        assert_eq!(update.display_title().as_deref(), Some("Release"));
+    }
+
+    #[test]
     fn month_navigation_handles_year_boundary() {
         let december = NaiveDate::from_ymd_opt(2026, 12, 18).unwrap();
         assert_eq!(
@@ -898,6 +1133,8 @@ pub struct UpdatesUi {
     pub statuses: Vec<Status>,
     pub priorities: Vec<u8>,
     pub date_filter: usize,
+    #[serde(default)]
+    pub tags: Vec<String>,
     pub range_start: Option<NaiveDate>,
     pub range_end: Option<NaiveDate>,
     pub collapsed: Vec<String>,

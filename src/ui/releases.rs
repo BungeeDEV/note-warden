@@ -504,11 +504,11 @@ impl NoteWarden {
                         div()
                             .text_size(palette::fs(palette::FS_BASE))
                             .text_color(p.text_secondary)
-                            .child(if update.title.trim().is_empty() {
-                                "Ohne Titel".to_owned()
-                            } else {
-                                update.title.clone()
-                            }),
+                            .child(
+                                update
+                                    .display_title()
+                                    .unwrap_or_else(|| "Ohne Titel".into()),
+                            ),
                     )
                     .child(
                         div()

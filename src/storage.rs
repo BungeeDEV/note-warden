@@ -22,9 +22,29 @@ fn fresh_workspace() -> Workspace {
     workspace
 }
 
+/// An empty `.portable` file next to the executable keeps all data in a `Data/` folder beside it.
+fn portable_data_dir(exe_dir: &Path) -> Option<PathBuf> {
+    exe_dir
+        .join(".portable")
+        .is_file()
+        .then(|| exe_dir.join("Data"))
+}
+
+fn portable_dir() -> Option<PathBuf> {
+    portable_data_dir(std::env::current_exe().ok()?.parent()?)
+}
+
+/// True if the data lives next to the executable (`NOTE_WARDEN_DATA_DIR` wins and is not portable mode).
+pub fn is_portable() -> bool {
+    std::env::var_os("NOTE_WARDEN_DATA_DIR").is_none() && portable_dir().is_some()
+}
+
 pub fn data_path() -> PathBuf {
     if let Some(dir) = std::env::var_os("NOTE_WARDEN_DATA_DIR") {
         return PathBuf::from(dir).join("workspace.json");
+    }
+    if let Some(dir) = portable_dir() {
+        return dir.join("workspace.json");
     }
     ProjectDirs::from("", "Note Warden", "Note Warden")
         .map(|dirs| dirs.data_local_dir().join("workspace.json"))
@@ -402,6 +422,8 @@ pub fn prune_history(path: &Path, existing: &std::collections::BTreeSet<u64>) {
 #[derive(serde::Serialize, serde::Deserialize, Default)]
 pub struct Prefs {
     #[serde(default)]
+    pub compact: crate::compact::CompactSettings,
+    #[serde(default)]
     pub theme: crate::model::ThemeChoice,
     #[serde(default)]
     pub accent: crate::model::Accent,
@@ -412,6 +434,11 @@ pub struct Prefs {
 impl From<&crate::model::Settings> for Prefs {
     fn from(s: &crate::model::Settings) -> Self {
         Self {
+            compact: if s.remember_window {
+                s.compact.clone()
+            } else {
+                Default::default()
+            },
             theme: s.theme,
             accent: s.accent,
             window_size: s.remember_window.then_some(s.window_size).flatten(),
@@ -472,6 +499,17 @@ pub fn save(path: &Path, workspace: &Workspace) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn portable_marker_moves_the_data_next_to_the_executable() {
+        let dir = std::env::temp_dir().join(format!("nw-portable-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        assert_eq!(portable_data_dir(&dir), None);
+        fs::write(dir.join(".portable"), b"").unwrap();
+        assert_eq!(portable_data_dir(&dir), Some(dir.join("Data")));
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
     use chrono::NaiveDate;
 
     fn temp_path(label: &str) -> PathBuf {
