@@ -94,6 +94,9 @@ $ruleset = @{
         @{ type = 'deletion' },
         @{ type = 'non_fast_forward' },
         @{ type = 'required_linear_history' },
+        @{ type = 'code_scanning'; parameters = @{
+            code_scanning_tools = @(@{ tool = 'CodeQL'; alerts_threshold = 'errors'; security_alerts_threshold = 'high_or_higher' })
+        } },
         @{ type = 'pull_request'; parameters = @{
             required_approving_review_count = 0
             dismiss_stale_reviews_on_push = $true

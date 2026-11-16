@@ -24,9 +24,12 @@ Die CI startet auf jedem Pull Request und bei jedem Push auf `main`, ohne Pfadfi
 - Einen optimierten Windows-Build und einen echten Installer-Durchlauf mit Erstinstallation, erneuter Installation, Dateiprüfung und datenerhaltender Deinstallation.
 - UI-Regeln, Versionsdateien, Changelog, Release-Werkzeug und PowerShell-Syntax.
 - Reproduzierbare npm-Installation, bekannte npm-Sicherheitslücken ab Schweregrad „high“ und die Syntax der Actions-Workflows.
+- Dependency Review blockiert neu eingeführte Abhängigkeiten mit bekannten Sicherheitslücken ab „high“, einschließlich Entwicklungsabhängigkeiten.
 - CodeQL für Rust, GitHub Actions, JavaScript und Python; zusätzlich wöchentlich auf dem Hauptzweig.
 
 `CI passed` wird nur grün, wenn alle zugehörigen Jobs erfolgreich waren. Zusammen mit den vier CodeQL-Jobs ist dieser Status für `main` erforderlich. Neue Commits im PR starten die Prüfungen erneut; überholte Läufe werden abgebrochen. Vor dem Merge muss der Branch aktuell sein. Zusammenführen erfolgt per Squash; erledigte Branches werden automatisch gelöscht.
+
+Die Code-Scanning-Regel blockiert zusätzlich neue CodeQL-Sicherheitsbefunde ab „high“ sowie Fehlerbefunde. Bei einer Neueinrichtung CodeQL zuerst auf dem Hauptzweig ausführen, damit GitHub die nötige Vergleichsbasis besitzt, und anschließend das Konfigurationsskript anwenden.
 
 Für das Einzelentwickler-Projekt ist keine fremde Freigabe vorgeschrieben, weil der Autor den eigenen PR nicht freigeben kann. Der PR und die bestandenen Prüfungen sind trotzdem Pflicht. Mit weiteren Maintainers kann später eine verpflichtende Freigabe ergänzt werden.
 
