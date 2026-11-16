@@ -15,6 +15,7 @@
 ### Maintenance
 * Automatische PR-Prüfungen für Windows, Installer, Rust, UI und Release-Metadaten sowie ein dokumentierter GitHub-Workflow.
 * Release-Vorbereitung mit synchronisierten Versionsdateien und geprüftem Draft-Release vom Hauptzweig.
+* Repository-Dokumentation, Code-Kommentare und Entwickler-Meldungen sind jetzt Englisch (README, CONTRIBUTING, docs/, PR-Vorlage); veraltete Einmal-Skripte unter `scripts/` entfernt. Die App-Oberfläche und dieses Changelog bleiben Deutsch.
 
 ## 1.1.0
 

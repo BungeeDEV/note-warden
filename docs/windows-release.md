@@ -1,64 +1,64 @@
-# Windows-Installer und GitHub-Updates
+# Windows installer and GitHub updates
 
-## Aktueller Stand
+## Current state
 
-**Version 1.1.0 ist veröffentlicht:** [Release](https://github.com/BungeeDEV/note-warden/releases/tag/v1.1.0) · [Windows-Setup](https://github.com/BungeeDEV/note-warden/releases/download/v1.1.0/NoteWarden-1.1.0-setup.exe). Der [endgültige CI-Lauf](https://github.com/BungeeDEV/note-warden/actions/runs/43859880740) hat Formatierung, Clippy, 37 Tests, offizielle Minisign-Prüfung, Setup-Build, Erstinstallation, erneute Installation und datenerhaltende Deinstallation bestanden. Nach Veröffentlichung hat der tatsächliche Rust-Updater das öffentliche Manifest und den Installer erfolgreich geladen und dessen Signatur geprüft.
+**Version 1.1.0 is published:** [release](https://github.com/BungeeDEV/note-warden/releases/tag/v1.1.0) · [Windows setup](https://github.com/BungeeDEV/note-warden/releases/download/v1.1.0/NoteWarden-1.1.0-setup.exe). The [final CI run](https://github.com/BungeeDEV/note-warden/actions/runs/43859880740) passed formatting, Clippy, 37 tests, the official Minisign verification, the setup build, first install, reinstall and an uninstall that preserves data. After publication, the actual Rust updater successfully downloaded the public manifest and the installer and verified its signature.
 
-Das öffentliche Projekt- und Release-Repository ist **[BungeeDEV/note-warden](https://github.com/BungeeDEV/note-warden)**. Der Nutzer hat die Veröffentlichung des App-Quellcodes freigegeben. Persönliche Entwicklungsdaten, Arbeitsdaten und private Schlüssel sind ausgeschlossen; `.claude` verweist auf persönliche Entwicklungsdaten und wird nicht hochgeladen.
+The public project and release repository is **[BungeeDEV/note-warden](https://github.com/BungeeDEV/note-warden)**. The user approved publishing the app's source code. Personal development data, working data and private keys are excluded; `.claude` points to personal development data and is not uploaded.
 
-Der lokale Setup-Compiler konnte aufgrund einer automatischen Freigabeablehnung nicht eingerichtet werden. Der reproduzierbare Installer-Build läuft deshalb auf GitHubs `windows-2025`-Runner mit vorhandenem Inno Setup. Der Workflow erstellt zunächst einen Entwurf, der vor der Veröffentlichung geprüft wird. Der Status steht unter [Actions](https://github.com/BungeeDEV/note-warden/actions).
+The local setup compiler could not be installed because an automatic approval was denied. The reproducible installer build therefore runs on GitHub's `windows-2025` runner, which has Inno Setup. The workflow first creates a draft that is reviewed before publishing. The status is shown under [Actions](https://github.com/BungeeDEV/note-warden/actions).
 
-## Normaler Release-Ablauf auf GitHub
+## Normal release flow on GitHub
 
-1. Änderungen während der Entwicklung unter `## Unreleased` in `CHANGELOG.md` sammeln. Für ein Release einen Branch anlegen und beispielsweise `python scripts/release.py prepare 1.2.0` ausführen. Das Werkzeug erhöht Cargo-, npm- und README-Versionen gemeinsam, aktualisiert beide Lockfiles ohne Abhängigkeitsupdates und verschiebt die gesammelten Notizen in den neuen Versionsabschnitt. `1.2.0` ist ein Beispiel; die nächste passende Version wählen.
-2. `./scripts/check.ps1` ausführen, den Diff prüfen und einen Pull Request öffnen. Nach erfolgreicher CI und Review per Squash in `main` übernehmen.
-3. Den Workflow **Windows installer release** auf dem aktuellen **main** starten und die vorbereitete Version eingeben, alternativ `gh workflow run release.yml --ref main --repo BungeeDEV/note-warden -f version=1.2.0`.
-4. Der Workflow lehnt abweichende Versionsangaben, andere Branches, einen inzwischen veränderten Hauptzweig und bereits veröffentlichte Versionen vor dem Signieren ab. Er führt die vollständige CI einschließlich Installer-Test erneut aus und erstellt danach in der auf `main` beschränkten Umgebung `release` das signierte Setup. PR-Prüfungen benötigen keinen Signierschlüssel. CI- und Release-Caches sind getrennt.
-5. Setup, `.minisig`, `latest.json` und Prüfsummen erscheinen in einem **Draft Release**. Im Actions-Artefakt und im Entwurf Dateien und Release-Notizen prüfen. Erst dann den Entwurf auf GitHub veröffentlichen. Unveränderliche Releases schützen danach Assets und Tag; Korrekturen benötigen eine neue Version. Der Updater sieht Entwürfe nicht.
+1. Collect changes under `## Unreleased` in `CHANGELOG.md` during development. For a release, create a branch and run, for example, `python scripts/release.py prepare 1.2.0`. The tool raises the Cargo, npm and README versions together, updates both lockfiles without any dependency updates and moves the collected notes into the new version section. `1.2.0` is an example; choose the next suitable version.
+2. Run `./scripts/check.ps1`, review the diff and open a pull request. After successful CI and review, merge it into `main` by squash.
+3. Start the **Windows installer release** workflow on the current **main** and enter the prepared version, or alternatively run `gh workflow run release.yml --ref main --repo BungeeDEV/note-warden -f version=1.2.0`.
+4. Before signing, the workflow rejects mismatching version input, other branches, a main branch that has changed in the meantime, and versions that are already published. It runs the complete CI again, including the installer test, and then creates the signed setup in the `release` environment, which is restricted to `main`. Pull request checks do not need a signing key. CI and release caches are separate.
+5. The setup, `.minisig`, `latest.json` and checksums appear in a **draft release**. Check the files and release notes in the Actions artifact and in the draft. Only then publish the draft on GitHub. Immutable releases then protect the assets and the tag; corrections require a new version. The updater does not see drafts.
 
-Die Versionsnummer folgt SemVer: Patch für kompatible Fehlerkorrekturen, Minor für kompatible neue Funktionen und Major für inkompatible Änderungen. Die Automatisierung veröffentlicht keine Releases beim normalen Push oder Merge. Die Konfiguration für automatisch generierte GitHub-Notizen liegt in `.github/release.yml`; die ausgelieferten App-Notizen stammen aus dem geprüften Versionsabschnitt in `CHANGELOG.md`.
+The version number follows SemVer: patch for compatible bug fixes, minor for compatible new features and major for incompatible changes. The automation does not publish releases on a normal push or merge. The configuration for automatically generated GitHub notes is in `.github/release.yml`; the app release notes shipped with a release come from the verified version section in `CHANGELOG.md`.
 
-Der Workflow verwendet `installer/update-signing.pub` und das Environment-Secret `NOTE_WARDEN_MINISIGN_KEY` in der GitHub-Umgebung `release`. Diese erlaubt nur den Branch `main`. Der öffentliche Schlüssel ist fest im jeweiligen Release-Build eingebettet. Der private Schlüssel wird nur auf dem kurzlebigen Runner in eine temporäre Datei geschrieben und danach entfernt. `python scripts/manage-release-key.py --repository BungeeDEV/note-warden --upload` hinterlegt die bestehende lokale Schlüsselkopie standardmäßig in dieser Umgebung; bei einer Neueinrichtung zuerst `scripts/configure-github.ps1 -Apply` ausführen.
+The workflow uses `installer/update-signing.pub` and the environment secret `NOTE_WARDEN_MINISIGN_KEY` in the GitHub environment `release`. That environment only allows the `main` branch. The public key is embedded into each release build. The private key is only written to a temporary file on the short-lived runner and removed afterwards. `python scripts/manage-release-key.py --repository BungeeDEV/note-warden --upload` stores the existing local key copy in this environment by default; for a fresh setup, run `scripts/configure-github.ps1 -Apply` first.
 
-Eine zusätzliche lokale Schlüsselkopie liegt durch Windows DPAPI verschlüsselt außerhalb des Projekts unter `%LOCALAPPDATA%\NoteWardenSigning\note-warden.key.dpapi`. Sie ist an das aktuelle Windows-Benutzerprofil gebunden. Vor einem Rechnerwechsel muss eine separate, geschützte Schlüssel-Sicherung angelegt werden. `scripts/manage-release-key.py` kann die vorhandene Kopie erneut als GitHub-Secret hinterlegen, ohne einen neuen Schlüssel zu erzeugen. Ein bewusst angeforderter `--export` schreibt einen unverschlüsselten Minisign-Schlüssel ausschließlich außerhalb des Projekts; eine solche Exportdatei muss anschließend separat geschützt werden.
+An additional local key copy is stored outside the project, encrypted with Windows DPAPI, at `%LOCALAPPDATA%\NoteWardenSigning\note-warden.key.dpapi`. It is bound to the current Windows user profile. Before changing machines, create a separate, protected key backup. `scripts/manage-release-key.py` can store the existing copy as a GitHub secret again without generating a new key. An explicitly requested `--export` writes an unencrypted Minisign key exclusively outside the project; such an export file must then be protected separately.
 
-Der signierte öffentliche Testvektor unter `installer/release-key-check.txt` wird sowohl vom Rust-Verifier als auch vom offiziellen Minisign auf dem Runner geprüft.
+The signed public test vector at `installer/release-key-check.txt` is verified by both the Rust verifier and the official Minisign on the runner.
 
-## Ablauf für Nutzer
+## Flow for users
 
-Einmal das Setup ausführen, danach Note Warden über das Startmenü starten. Eine Desktop-Verknüpfung ist optional. Die Installation liegt standardmäßig unter `%LOCALAPPDATA%\Programs\Note Warden`, ohne Administratorrechte.
+Run the setup once, then start Note Warden from the Start menu. A desktop shortcut is optional. By default the installation is located at `%LOCALAPPDATA%\Programs\Note Warden`, without administrator rights.
 
-Die App prüft beim Start höchstens einmal täglich auf Updates. Unter **Einstellungen → Über & Updates** ist eine manuelle Prüfung möglich. Nach Zustimmung lädt sie das Update, prüft die Minisign-Signatur, erstellt ein Datenbackup und startet das Setup. Die App beendet sich; das Setup aktualisiert die vorhandene Installation und startet Note Warden wieder. Nutzerdaten liegen separat und bleiben bei Update und Deinstallation erhalten.
+The app checks for updates at most once a day on start. A manual check is available under **Einstellungen → Über & Updates** (Settings → About & Updates). After the user agrees, it downloads the update, verifies the Minisign signature, creates a data backup and starts the setup. The app exits; the setup updates the existing installation and starts Note Warden again. User data is stored separately and is kept across update and uninstall.
 
-## Build-Voraussetzungen
+## Build requirements
 
-- Rust und MSVC-Buildtools.
-- [Inno Setup 6 oder 7](https://jrsoftware.org/inno-setup/downloads), `ISCC.exe` im PATH oder über `-InnoCompiler` angegeben.
-- [Minisign](https://jedisct1.github.io/minisign/) für signierte Releases, `minisign.exe` im PATH.
-- GitHub CLI mit Zugriff auf das öffentliche Download-Repository.
+- Rust and the MSVC build tools.
+- [Inno Setup 6 or 7](https://jrsoftware.org/inno-setup/downloads), with `ISCC.exe` on the PATH or given via `-InnoCompiler`.
+- [Minisign](https://jedisct1.github.io/minisign/) for signed releases, with `minisign.exe` on the PATH.
+- GitHub CLI with access to the public download repository.
 
-Das Skript installiert oder lädt keine Werkzeuge nach. Die benötigte `vcruntime140.dll` wird aus dem offiziellen Redist-Verzeichnis der vorhandenen Visual-Studio-Toolchain mitgeliefert. Abweichende Pfade sind über `-VCRuntimeDirectory` möglich. Siehe [Microsoft zur app-lokalen VC++-Laufzeit](https://learn.microsoft.com/cpp/windows/redistributing-visual-cpp-files).
+The script does not install or download any tools. The required `vcruntime140.dll` is bundled from the official redist directory of the existing Visual Studio toolchain. Other paths can be given with `-VCRuntimeDirectory`. See [Microsoft on the app-local VC++ runtime](https://learn.microsoft.com/cpp/windows/redistributing-visual-cpp-files).
 
-## Signaturschlüssel
+## Signing key
 
-Ein Minisign-Schlüsselpaar außerhalb des Projekts erzeugen. Beispielpfade:
+Generate a Minisign key pair outside the project. Example paths:
 
-- öffentlich: `%USERPROFILE%\NoteWardenSigning\note-warden.pub`
-- privat: `%USERPROFILE%\NoteWardenSigning\note-warden.key`
+- public: `%USERPROFILE%\NoteWardenSigning\note-warden.pub`
+- private: `%USERPROFILE%\NoteWardenSigning\note-warden.key`
 
-Mit `minisign -G -p <öffentlicher-Pfad> -s <privater-Pfad>` erzeugen und ein Passwort lokal vergeben. Schlüssel und Passwort getrennt sichern. Der private Schlüssel gehört weder in den Quellcode noch in Release-Dateien. Bestehende Installationen vertrauen dem eingebetteten öffentlichen Schlüssel; der private Schlüssel muss für künftige Updates erhalten bleiben.
+Generate them with `minisign -G -p <public-path> -s <private-path>` and set a password locally. Back up the key and the password separately. The private key belongs neither in the source code nor in release files. Existing installations trust the embedded public key; the private key has to be kept for future updates.
 
-Minisign schützt die App-Updates. Die Windows-Authenticode-Herausgebersignierung ist ein separater Schritt und derzeit nicht eingerichtet.
+Minisign protects the app updates. Windows Authenticode publisher signing is a separate step and is not set up at the moment.
 
-## Installer bauen
+## Building the installer
 
-Nur lokal, ohne Online-Updater:
+Local only, without the online updater:
 
 ```powershell
 ./scripts/build-installer.ps1
 ```
 
-Für den signierten GitHub-Update-Kanal:
+For the signed GitHub update channel:
 
 ```powershell
 ./scripts/build-installer.ps1 `
@@ -67,28 +67,28 @@ Für den signierten GitHub-Update-Kanal:
   -SigningKeyFile "$env:USERPROFILE\NoteWardenSigning\note-warden.key"
 ```
 
-Den tatsächlich freigegebenen Repository-Namen verwenden. Das Skript liest die Version aus Cargo-Metadaten, bettet Endpunkt und öffentlichen Schlüssel ein, baut die optimierte Windows-App ohne Konsole und erzeugt das Setup. Es signiert und verifiziert das Setup, erstellt `latest.json`, `.minisig`, `release-notes.md` und `SHA256SUMS.txt`. GitHub-Dateien liegen standardmäßig in `target/installer/github`, lokale Installer separat in `target/installer/local`; Cargo-Zielverzeichnisse werden berücksichtigt. Es lädt nichts hoch.
+Use the repository name that was actually approved. The script reads the version from the Cargo metadata, embeds the endpoint and the public key, builds the optimized Windows app without a console and creates the setup. It signs and verifies the setup and creates `latest.json`, `.minisig`, `release-notes.md` and `SHA256SUMS.txt`. GitHub files go to `target/installer/github` by default and local installers separately to `target/installer/local`; Cargo target directories are respected. It uploads nothing.
 
-Version vor einem neuen Release in Cargo- und Paketdateien erhöhen und einen passenden Abschnitt in `CHANGELOG.md` ergänzen. Der Installer übernimmt die Cargo-Version automatisch.
+Before a new release, raise the version in the Cargo and package files and add a matching section to `CHANGELOG.md`. The installer takes the Cargo version automatically.
 
-## GitHub-Release vorbereiten
+## Preparing a GitHub release
 
-Nach bestätigtem Anlegen des öffentlichen Download-Repositories und lokal geprüftem Setup:
+After the public download repository has been created with confirmation and the setup has been checked locally:
 
 ```powershell
 ./scripts/publish-release.ps1 -GitHubRepository BungeeDEV/note-warden
 ```
 
-Das Skript prüft Repository und Manifest und erstellt einen **Draft Release** mit Setup, Minisign-Datei, Update-Datei und Prüfsummen. Der Quellcode wird nicht hochgeladen. Der Entwurf liefert noch kein Update an installierte Apps aus. Erst nach Review auf GitHub veröffentlichen.
+The script checks the repository and the manifest and creates a **draft release** with the setup, the Minisign file, the update file and checksums. The source code is not uploaded. The draft does not deliver an update to installed apps yet. Only publish it on GitHub after review.
 
-Der fest eingebettete Endpunkt ist `https://github.com/<owner>/<repo>/releases/latest/download/latest.json`. Das Manifest verweist auf den versionierten Setup-Download desselben Releases.
+The embedded endpoint is `https://github.com/<owner>/<repo>/releases/latest/download/latest.json`. The manifest points to the versioned setup download of the same release.
 
-## Noch ausstehende Abnahme
+## Acceptance still pending
 
-Erstinstallation, erneute Installation am selben benutzerdefinierten Pfad, Payload-Prüfsummen, Laufzeitdateien und datenerhaltende Deinstallation wurden auf einem frischen CI-Rechner erfolgreich geprüft. Der öffentliche Download und die Signaturprüfung wurden danach mit dem tatsächlichen Updater-Code geprüft. Ein vollständiger Wechsel zwischen zwei unterschiedlichen veröffentlichten App-Versionen einschließlich laufender App/Tray und automatischem Neustart steht noch aus. Die Backup- und Signaturfehlerpfade sind zusätzlich durch die vorhandenen Tests abgedeckt.
+First install, reinstall at the same custom path, payload checksums, runtime files and an uninstall that preserves data were successfully checked on a fresh CI machine. The public download and the signature verification were then checked with the actual updater code. A complete switch between two different published app versions, including a running app/tray and an automatic restart, is still pending. The backup and signature failure paths are additionally covered by the existing tests.
 
-Die Updater-Tests decken gültige Signaturen, manipulierte Downloads, ungültige Schlüssel/Signaturen, unsichere Versionsnamen und HTTP-Adressen ab. Netzwerkzugriffe sind auf HTTPS begrenzt; Manifest und Installer besitzen Größenlimits. Zusätzlich wird das tatsächliche Release-Schlüsselpaar anhand einer veröffentlichten Testsignatur geprüft. Die PowerShell-Skripte sind syntaktisch geprüft; ihre Ausführung erfolgt im Release-Workflow.
+The updater tests cover valid signatures, tampered downloads, invalid keys/signatures, unsafe version names and HTTP addresses. Network access is limited to HTTPS; the manifest and the installer have size limits. In addition, the actual release key pair is verified against a published test signature. The PowerShell scripts are syntax-checked; they are executed in the release workflow.
 
-Die explizite Neustart-Aktion des Setups verwendet den dokumentierten [Inno-Update-Modus](https://jrsoftware.org/inno-setup/documentation/topic_technotes.htm); sie setzt keine Windows-Restart-Manager-Registrierung voraus, die [RestartApplications](https://jrsoftware.org/ishelp/topic_setup_restartapplications.htm) sonst benötigt.
+The setup's explicit restart action uses the documented [Inno update mode](https://jrsoftware.org/inno-setup/documentation/topic_technotes.htm); it does not require the Windows Restart Manager registration that [RestartApplications](https://jrsoftware.org/ishelp/topic_setup_restartapplications.htm) would otherwise need.
 
-Wenn während eines Release-Builds Änderungen an `.github/workflows/` auf den Hauptzweig gepusht werden, kann GitHub das Erstellen eines Tags auf dem älteren Commit mit dem eingeschränkten CI-Token ablehnen. In diesem Fall den Workflow auf dem aktuellen Hauptzweig erneut starten. Veröffentlichte Release-Dateien werden vom Skript niemals ersetzt; vor einem weiteren Release muss die Version erhöht werden.
+If changes to `.github/workflows/` are pushed to the main branch while a release build is running, GitHub may refuse to create a tag on the older commit with the restricted CI token. In that case, start the workflow again on the current main branch. The script never replaces published release files; the version has to be raised before another release.

@@ -53,7 +53,7 @@ $snapshotPath = Join-Path $gitDir ('github-settings-before-' + (Get-Date -Format
 $snapshot | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $snapshotPath -Encoding utf8NoBOM
 
 [void](Invoke-GitHub PATCH $base @{
-    description = 'Lokale Windows-App für Updatepläne, Notizen, Aufgaben und Erinnerungen. Rust, GPUI und signierte App-Updates.'
+    description = 'Local Windows app for update plans, notes, tasks and reminders. Rust, GPUI and signed app updates.'
     allow_squash_merge = $true
     allow_merge_commit = $false
     allow_rebase_merge = $false

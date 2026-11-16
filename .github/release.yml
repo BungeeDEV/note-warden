@@ -2,11 +2,11 @@ changelog:
   exclude:
     labels: [duplicate, invalid, wontfix]
   categories:
-    - title: Fehlerbehebungen
+    - title: Bug fixes
       labels: [bug]
-    - title: Verbesserungen
+    - title: Improvements
       labels: [enhancement, accessibility]
-    - title: Dokumentation
+    - title: Documentation
       labels: [documentation]
-    - title: Weitere Änderungen
+    - title: Other changes
       labels: ['*']

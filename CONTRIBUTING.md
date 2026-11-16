@@ -1,50 +1,52 @@
-# Entwicklung und Pull Requests
+# Development and pull requests
 
-Note Warden ist eine Windows-App. Rust und MSVC-Buildtools, Node.js 24+ und Python 3.11+ sind für die lokalen Prüfungen erforderlich. Die Rust-Version einschließlich Clippy und rustfmt steht in `rust-toolchain.toml`.
+Note Warden is a Windows app. Rust and the MSVC build tools, Node.js 24+ and Python 3.11+ are required for the local checks. The Rust version, including Clippy and rustfmt, is pinned in `rust-toolchain.toml`.
 
-## Eine Änderung einbauen
+Repository documentation, code comments, commit messages and pull request descriptions are written in English. The app's interface is German for now, so user-facing strings in `src/` stay German, and so does `CHANGELOG.md`: the app shows it in its changelog dialog and the release notes are built from it.
+
+## Making a change
 
 ```powershell
 git switch main
 git pull --ff-only
-git switch -c feat/kurze-beschreibung
-# Änderung und passende Tests umsetzen
+git switch -c feat/short-description
+# implement the change and matching tests
 ./scripts/check.ps1
-git add <geänderte-dateien>
-git commit -m "feat: kurze Beschreibung"
+git add <changed-files>
+git commit -m "feat: short description"
 git push -u origin HEAD
 gh pr create
 ```
 
-Für Fehlerkorrekturen `fix/...`, für Wartung `chore/...` verwenden. Kleine, abgeschlossene Pull Requests halten Review und Rücknahme übersichtlich. Nutzerrelevante Änderungen unter `## Unreleased` in `CHANGELOG.md` sammeln. Bei UI-Änderungen die [UI-Regeln](docs/ui-guidelines.md) und eine manuelle Prüfung der betroffenen Ansichten und Tastaturbedienung einbeziehen.
+Use `fix/...` for bug fixes and `chore/...` for maintenance. Small, self-contained pull requests keep review and rollback manageable. Collect user-relevant changes under `## Unreleased` in `CHANGELOG.md`. For UI changes, follow the [UI guidelines](docs/ui-guidelines.md) and check the affected views and keyboard operation manually.
 
-Die CI startet auf jedem Pull Request und bei jedem Push auf `main`, ohne Pfadfilter. Sie prüft:
+CI runs on every pull request and every push to `main`, without path filters. It checks:
 
-- Formatierung, Clippy mit `-D warnings` und sämtliche Rust-Test-Targets.
-- Einen optimierten Windows-Build und einen echten Installer-Durchlauf mit Erstinstallation, erneuter Installation, Dateiprüfung und datenerhaltender Deinstallation.
-- UI-Regeln, Versionsdateien, Changelog, Release-Werkzeug und PowerShell-Syntax.
-- Reproduzierbare npm-Installation, bekannte npm-Sicherheitslücken ab Schweregrad „high“ und die Syntax der Actions-Workflows.
-- Dependency Review blockiert neu eingeführte Abhängigkeiten mit bekannten Sicherheitslücken ab „high“, einschließlich Entwicklungsabhängigkeiten.
-- CodeQL für Rust, GitHub Actions, JavaScript und Python; zusätzlich wöchentlich auf dem Hauptzweig.
+- Formatting, Clippy with `-D warnings` and all Rust test targets.
+- An optimized Windows build and a real installer run covering first install, reinstall, file checks and an uninstall that preserves data.
+- UI rules, version files, changelog, the release tooling and PowerShell syntax.
+- A reproducible npm install, known npm vulnerabilities of severity "high" or above, and the syntax of the Actions workflows.
+- Dependency review blocks newly introduced dependencies with known vulnerabilities of severity "high" or above, including development dependencies.
+- CodeQL for Rust, GitHub Actions, JavaScript and Python, and additionally weekly on the main branch.
 
-`CI passed` wird nur grün, wenn alle zugehörigen Jobs erfolgreich waren. Zusammen mit den vier CodeQL-Jobs ist dieser Status für `main` erforderlich. Neue Commits im PR starten die Prüfungen erneut; überholte Läufe werden abgebrochen. Vor dem Merge muss der Branch aktuell sein. Zusammenführen erfolgt per Squash; erledigte Branches werden automatisch gelöscht.
+`CI passed` only turns green if all related jobs succeeded. Together with the four CodeQL jobs, this status is required for `main`. New commits in a pull request restart the checks; superseded runs are cancelled. The branch must be up to date before merging. Merging is done by squash; finished branches are deleted automatically.
 
-Die Code-Scanning-Regel blockiert zusätzlich neue CodeQL-Sicherheitsbefunde ab „high“ sowie Fehlerbefunde. Bei einer Neueinrichtung CodeQL zuerst auf dem Hauptzweig ausführen, damit GitHub die nötige Vergleichsbasis besitzt, und anschließend das Konfigurationsskript anwenden.
+The code scanning rule additionally blocks new CodeQL security findings of severity "high" or above as well as error findings. When setting up from scratch, run CodeQL on the main branch first so that GitHub has the necessary baseline, and then apply the configuration script.
 
-Für das Einzelentwickler-Projekt ist keine fremde Freigabe vorgeschrieben, weil der Autor den eigenen PR nicht freigeben kann. Der PR und die bestandenen Prüfungen sind trotzdem Pflicht. Mit weiteren Maintainers kann später eine verpflichtende Freigabe ergänzt werden.
+This single-developer project does not require anyone else's approval, because an author cannot approve their own pull request. The pull request and the passing checks are still mandatory. A mandatory approval can be added later once there are more maintainers.
 
-Dependabot öffnet wöchentlich getrennte Updates für Rust, Branding-Werkzeuge und Actions. Kompatible Updates werden gruppiert; ein automatischer Merge von Abhängigkeiten ist nicht eingerichtet. Änderungen erst nach grüner CI und Review übernehmen. Dependabot-Meldungen ergänzen die Tests; nicht jede transitive Rust-Schwachstelle wird von Clippy oder CodeQL erkannt.
+Dependabot opens separate weekly updates for Rust, the branding tools and Actions. Compatible updates are grouped; automatic merging of dependencies is not set up. Adopt changes only after green CI and review. Dependabot alerts complement the tests; not every transitive Rust vulnerability is detected by Clippy or CodeQL.
 
 ## Releases
 
-Die Versionsnummer wird erst zur Release-Vorbereitung erhöht. [Release-Anleitung](docs/windows-release.md). Der Installer ist nur für stabile Versionen `x.y.z` vorgesehen; Vorabversionen benötigen einen getrennten Update-Kanal.
+The version number is only raised while preparing a release. See the [release guide](docs/windows-release.md). The installer is intended for stable versions `x.y.z` only; pre-releases need a separate update channel.
 
-## Repository-Einstellungen verwalten
+## Managing repository settings
 
-`./scripts/configure-github.ps1` zeigt die geplanten GitHub-Einstellungen an. Mit `-Apply` werden sie als Repository-Admin angewendet: Merge-Verfahren, Schutzregeln, Release-Umgebung, unveränderliche Releases, Secret-Scanning und Sicherheitsupdates. Das Skript aktualisiert nur das eigene benannte Ruleset und erhält andere Regeln. Vor Änderungen speichert es die bisherigen Einstellungen ohne Secret-Werte in `.git/github-settings-before-*.json`. Die Release-Umgebung erlaubt ausschließlich den Branch `main`; GitHub-Actions-Tokens haben standardmäßig nur Leserechte. Externe Actions sind an vollständige Commit-SHAs gebunden und werden von Dependabot gepflegt, entsprechend [GitHubs Sicherheitsempfehlung](https://docs.github.com/en/actions/reference/security/secure-use).
+`./scripts/configure-github.ps1` shows the planned GitHub settings. With `-Apply` they are applied as a repository admin: merge methods, protection rules, the release environment, immutable releases, secret scanning and security updates. The script only updates its own named ruleset and keeps other rules. Before making changes it saves the previous settings, without secret values, to `.git/github-settings-before-*.json`. The release environment only allows the `main` branch; GitHub Actions tokens have read-only permissions by default. External actions are pinned to full commit SHAs and maintained by Dependabot, following [GitHub's security guidance](https://docs.github.com/en/actions/reference/security/secure-use).
 
-## Git-Einstellungen
+## Git settings
 
-Die projektlokale Identität verwendet `BungeeDEV` und die bestehende GitHub-Noreply-Adresse. `pull.ff=only` verhindert unbeabsichtigte Merge-Commits beim Aktualisieren, `fetch.prune=true` räumt entfernte Branch-Verweise auf und `push.default=simple` begrenzt den normalen Push auf den aktuellen Branch. `push.autoSetupRemote=true` vereinfacht den ersten Push. `rerere.enabled=true` merkt sich Konfliktlösungen. `.gitattributes` bestimmt die Zeilenenden; lokal ist `core.autocrlf=false` gesetzt.
+The project-local identity uses `BungeeDEV` and the existing GitHub noreply address; commits carry no co-author trailers. `pull.ff=only` prevents unintended merge commits when updating, `fetch.prune=true` cleans up removed branch references and `push.default=simple` limits a normal push to the current branch. `push.autoSetupRemote=true` simplifies the first push. `rerere.enabled=true` remembers conflict resolutions. `.gitattributes` determines line endings; `core.autocrlf=false` is set locally.
 
-Diese Werte gelten für dieses Repository. Die globale Git-Identität und andere Projekte bleiben unberührt. GitHub-Biografie und Profil-README sind unabhängig davon.
+These values apply to this repository. The global Git identity and other projects are unaffected. The GitHub biography and profile README are independent of this.

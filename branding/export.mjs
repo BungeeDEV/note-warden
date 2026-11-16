@@ -8,7 +8,7 @@ const render = (file, size) =>
 mkdirSync('branding/icons', { recursive: true });
 writeFileSync('branding/logo-1024.png', render('branding/logo.svg', 1024));
 
-// Kleine Größen aus der kleinen Variante, große aus dem vollen Logo.
+// Small sizes from the small variant, large ones from the full logo.
 const sizes = [
   [16, 'branding/logo-small.svg'], [24, 'branding/logo-small.svg'], [32, 'branding/logo-small.svg'],
   [48, 'branding/logo-small.svg'], [64, 'branding/logo.svg'], [128, 'branding/logo.svg'], [256, 'branding/logo.svg'],

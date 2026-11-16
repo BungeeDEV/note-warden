@@ -1,142 +1,142 @@
-> Historische Designreferenz für DBWarden. Für die aktuelle Note-Warden-Oberfläche gelten [ui-guidelines.md](ui-guidelines.md) und der [Audit 1.1.0](ui-audit-1.1.0.md).
+> Historical design reference for DBWarden. For the current Note Warden interface, [ui-guidelines.md](ui-guidelines.md) and the [audit 1.1.0](ui-audit-1.1.0.md) apply.
 
-# DBWarden – Design-Spezifikation für Rust und GPUI
+# DBWarden – design specification for Rust and GPUI
 
-DBWarden ist ein nativer Desktop-Client für SQL-Arbeit. Der Standardbildschirm folgt der Referenz `preview.png` bei 1280 × 720. Die dunkle, kompakte Arbeitsfläche, die durchgehende Seitenleiste und das vertikal geteilte Editor-Ergebnis-Layout bestimmen das Erscheinungsbild. Das bisherige Design liefert die Grundlage für Farben, Typografie und Komponenten. Bei Abweichungen bestimmt der Screenshot die Geometrie des SQL-Arbeitsbereichs.
+DBWarden is a native desktop client for SQL work. The default screen follows the reference `preview.png` at 1280 × 720. The dark, compact workspace, the full-height sidebar and the vertically split editor/result layout determine the appearance. The existing design provides the basis for colors, typography and components. Where they differ, the screenshot determines the geometry of the SQL workspace.
 
-## 1. Technische Grundlage
+## 1. Technical basis
 
-- Rust und [GPUI](https://gpui.rs/) rendern das Fenster und alle UI-Elemente. Layout, Farben und Abstände sind typisierte Rust-Werte. WebView, DOM, CSS und Browser-Assets zur Laufzeit entfallen.
-- Eine kompatible GPUI-Version oder Git-Revision festlegen und `Cargo.lock` für die Desktop-App einchecken. Beispiele und optionale Komponenten gegen genau diese Version prüfen. Fenstersteuerung und Eingabe auf jeder unterstützten Zielplattform prüfen.
-- Die Shell und zustandsbehaftete Ansichten implementieren `Render`. Editordokumente, Tabs und Ergebniszustände leben in `Entity<T>` oder in entsprechend stabilen Rust-Modellen. GPUI-Elemente erhalten stabile IDs. Einfaches Layout entsteht mit `div()` und den GPUI-Layoutprimitiven.
-- Aktionen wie `RunQuery`, `CancelQuery`, `NewQueryTab` und `CloseQueryTab` über GPUI-Actions und fokusspezifische Keybindings binden. Buttons rufen dieselben Aktionen auf. Fokus über `FocusHandle` führen.
-- GPUI Kit ist eine optionale native Komponentenbibliothek. Für Textfelder, SQL-Editor und Tabelle zuerst Eingabeverhalten, Gestaltungsspielraum und GPUI-Kompatibilität prüfen. Für große Ergebnismengen kommt das virtualisierte DataTable oder ein eigener GPUI-Viewport mit virtualisierten Zeilen infrage.
-- SVG-Icons und Schriftdateien lokal mitliefern und über die GPUI-Assets laden. Eigene DBWarden-Schildmarke, einheitliche Outline-Icons für Bedienaktionen und keine Abhängigkeit von einem Icon-CDN.
+- Rust and [GPUI](https://gpui.rs/) render the window and all UI elements. Layout, colors and spacing are typed Rust values. A WebView, DOM, CSS and browser assets at runtime are omitted.
+- Pin a compatible GPUI version or Git revision and check in `Cargo.lock` for the desktop app. Check examples and optional components against exactly this version. Verify window control and input on every supported target platform.
+- The shell and stateful views implement `Render`. Editor documents, tabs and result state live in `Entity<T>` or in similarly stable Rust models. GPUI elements get stable IDs. Simple layout is built with `div()` and the GPUI layout primitives.
+- Bind actions such as `RunQuery`, `CancelQuery`, `NewQueryTab` and `CloseQueryTab` through GPUI actions and focus-specific key bindings. Buttons call the same actions. Manage focus through `FocusHandle`.
+- GPUI Kit is an optional native component library. For text fields, the SQL editor and the table, first check input behavior, design flexibility and GPUI compatibility. For large result sets, the virtualized DataTable or a custom GPUI viewport with virtualized rows is an option.
+- Ship SVG icons and font files locally and load them through the GPUI assets. A custom DBWarden shield mark, consistent outline icons for actions and no dependency on an icon CDN.
 
-## 2. Fenster und Layout
+## 2. Window and layout
 
-Alle Maße sind logische GPUI-Pixel. 1280 × 720 bezeichnet die Referenzfläche der App. Falls das Betriebssystem einen separaten Fensterrahmen rendert, kommt dieser außen hinzu. Die Maße sind Startwerte für die visuelle Abnahme.
+All dimensions are logical GPUI pixels. 1280 × 720 denotes the app's reference area. If the operating system renders a separate window frame, it is added on the outside. The dimensions are starting values for the visual acceptance.
 
-| Bereich | Maß bei 1280 × 720 | Aufbau |
+| Area | Size at 1280 × 720 | Structure |
 | --- | --- | --- |
-| Titelzeile | 40 px hoch | Schild, **DBWarden** und kleines `PREVIEW`-Badge links. Verbindungstitel optisch mittig. Hilfe rechts. Native Fensterknöpfe und Drag-Flächen plattformgerecht integrieren. |
-| Seitenleiste | 240 px breit | 12 px Außenabstand für Navigation. Explorer nimmt die flexible Höhe ein. Verbindungsaktion, Einstellungen und lokaler Arbeitsbereich bilden den unteren Block. |
-| Kontextzeile | 48 px hoch | Datenbank-Icon, **MariaDB · Demo**, Trenner, **SQL-Arbeitsbereich** und `DEMO`. Rechts Schloss und **Lesemodus**. |
-| Tab-Leiste | 40 px hoch | **Abfrage 1**, Schließen-Icon und Plus. 2 px Sky-Unterstreichung unter dem aktiven Tab. Bei vielen Tabs horizontal scrollen. |
-| Editor-Werkzeugleiste | 48 px hoch | 16 px Seitenabstand. **Ausführen** als 32 px hoher Primärbutton, Shortcut im Button, **bookshop** als Outline-Auswahl daneben. Rechts Ausführungshinweis, sofern Platz vorhanden. |
-| Editor | ca. 200 px hoch | Zeilennummern, SQL-Eingabe und eigene Statuszeile für Dialekt, Kodierung und Ausführungsmodus. |
-| Vertikaler Splitter | 4 px sichtbar | Trennt Editor und Ergebnis. Vergrößerte Trefferzone, Größenänderung per Maus und Tastatur. |
-| Ergebnis-Werkzeugleiste | 44 px hoch | **Ergebnis**, Zeilen-Badge, Filterfeld und Kopieraktion. |
-| Ergebnisraster | füllt den Rest | Kopf und Zeilen jeweils ca. 36 px. Separater Scrollbereich mit fixiertem Kopf und gemeinsamem horizontalem Offset für Kopf und Zellen. |
-| Ergebnisstatus | 32 px hoch | Trefferzahl und Ausführungsdauer links, **Beispieldaten** rechts. |
-| Globale Statusleiste | 28 px hoch | Verbindungsstatus links, App-Version mittig, Treiber und Datenquelle rechts. |
+| Title bar | 40 px high | Shield, **DBWarden** and a small `PREVIEW` badge on the left. Connection title visually centered. Help on the right. Integrate native window buttons and drag areas in a platform-appropriate way. |
+| Sidebar | 240 px wide | 12 px outer spacing for navigation. The explorer takes the flexible height. Connection action, settings and local workspace form the bottom block. |
+| Context row | 48 px high | Database icon, **MariaDB · Demo**, divider, **SQL workspace** and `DEMO`. On the right a lock and **Read mode**. |
+| Tab bar | 40 px high | **Query 1**, close icon and plus. 2 px sky underline under the active tab. Scroll horizontally with many tabs. |
+| Editor toolbar | 48 px high | 16 px side spacing. **Run** as a 32 px high primary button, shortcut inside the button, **bookshop** as an outline selector next to it. On the right an execution hint, if there is room. |
+| Editor | approx. 200 px high | Line numbers, SQL input and a separate status line for dialect, encoding and execution mode. |
+| Vertical splitter | 4 px visible | Separates editor and result. Enlarged hit zone, resizing by mouse and keyboard. |
+| Result toolbar | 44 px high | **Result**, row badge, filter field and copy action. |
+| Result grid | fills the rest | Header and rows approx. 36 px each. A separate scroll area with a fixed header and a shared horizontal offset for header and cells. |
+| Result status | 32 px high | Hit count and execution time on the left, **Sample data** on the right. |
+| Global status bar | 28 px high | Connection status on the left, app version in the center, driver and data source on the right. |
 
-### Verhalten bei kleinerem Fenster
+### Behavior in a smaller window
 
-Die Shell bleibt vertikal in Titelzeile, Arbeitsfläche und Statusleiste gegliedert. Sidebar und Hauptbereich teilen die Arbeitsfläche horizontal. Der Explorer, der Editor und das Ergebnis scrollen unabhängig. Die Sidebar startet bei 240 px. Unter 960 px Fensterbreite kann sie eingeklappt und per beschrifteter Umschaltaktion wieder geöffnet werden. Im Hauptbereich zuerst den Toolbar-Hinweis und sekundäre Statusdetails ausblenden. Tabs und Ergebnisspalten bleiben horizontal erreichbar. Editor und Ergebnis behalten am Splitter sinnvolle Mindesthöhen. Bei 720 px Referenzhöhe liegt der Splitter bei etwa y = 378 px. Danach folgt er dem gespeicherten Verhältnis innerhalb der verfügbaren Höhe.
+The shell stays vertically divided into title bar, workspace and status bar. The sidebar and the main area share the workspace horizontally. The explorer, the editor and the result scroll independently. The sidebar starts at 240 px. Below 960 px window width it can be collapsed and reopened with a labeled toggle action. In the main area, first hide the toolbar hint and secondary status details. Tabs and result columns stay reachable horizontally. The editor and the result keep sensible minimum heights at the splitter. At the 720 px reference height, the splitter is at about y = 378 px. After that it follows the saved ratio within the available height.
 
-## 3. Farben, Typografie und Form
+## 3. Colors, typography and shape
 
-| Token | Standard | Verwendung |
+| Token | Default | Use |
 | --- | --- | --- |
-| `canvas` / `surface` | `#171717` / `#191919` | App-Hintergrund, Seitenleiste und angehobene Arbeitsflächen |
-| `hover` / `active_row` | `#232323` / `#1D1D1D` | Hoverflächen und aktive Editorzeile |
-| `separator` / `control_border` | `#272727` / `#3A3A3A` | Raster, Trennlinien und Feldkonturen |
-| `text` / `text_secondary` / `text_muted` | `#F0F0F0` / `#B4B4B4` / `#929292` | Primärtext, Nebeninformationen und Metatext |
-| `accent` / `accent_text` | `#0EA5E9` / `#38BDF8` | Primärfläche, Fokus, aktiver Tab, Navigation und SQL-Keywords |
-| `accent_subtle` / `on_accent` | `#142832` / `#0A0A0A` | Aktive Navigation und lesbare Button-Beschriftung |
-| `success` / `warning` / `danger` | `#34D399` / `#FBBF24` / `#F87171` | Statusfarben mit Icon oder Textlabel |
+| `canvas` / `surface` | `#171717` / `#191919` | App background, sidebar and raised work surfaces |
+| `hover` / `active_row` | `#232323` / `#1D1D1D` | Hover surfaces and the active editor row |
+| `separator` / `control_border` | `#272727` / `#3A3A3A` | Grid, dividers and field outlines |
+| `text` / `text_secondary` / `text_muted` | `#F0F0F0` / `#B4B4B4` / `#929292` | Primary text, secondary information and meta text |
+| `accent` / `accent_text` | `#0EA5E9` / `#38BDF8` | Primary surface, focus, active tab, navigation and SQL keywords |
+| `accent_subtle` / `on_accent` | `#142832` / `#0A0A0A` | Active navigation and readable button labels |
+| `success` / `warning` / `danger` | `#34D399` / `#FBBF24` / `#F87171` | Status colors with an icon or a text label |
 
-Die Palette orientiert sich am Screenshot. Status- und Metatexte sind für Lesbarkeit etwas heller gesetzt. Der Primärbutton nutzt dunklen Vordergrund. Pro Theme Text und relevante Kontrollzustände auf tatsächlichem Hintergrund prüfen. Zielwerte sind 4,5:1 für normalen Text und 3:1 für wesentliche Bedienelementgrenzen oder Fokusindikatoren. Deko-Trennlinien dürfen subtiler ausfallen.
+The palette is based on the screenshot. Status and meta texts are set somewhat lighter for readability. The primary button uses a dark foreground. Per theme, check text and relevant control states on the actual background. Target values are 4.5:1 for normal text and 3:1 for essential control boundaries or focus indicators. Decorative dividers may be more subtle.
 
-- **UI-Schrift** Inter, 14 px Standard, 13 px für dichte Bedienelemente, 11–12 px für Status, Zähler und Labels. Explorer-Überschrift in Versalien mit leicht erhöhtem Zeichenabstand. Plattformschrift als Fallback.
-- **Mono** JetBrains Mono, 13 px für SQL und Datenwerte, 12 px für Tabellennamen und technische Metadaten. Plattform-Monospace als Fallback. Editor-Zeilenhöhe ca. 24 px.
-- **Konturen** 1 px. Radien 6–8 px für Felder und Buttons, 10–12 px für Karten und Menüs, 16 px für Dialoge. Ergebnisraster und Shell haben eckige, durchgehende Kanten.
-- **Icons** 16–18 px für Navigation und Aktionen, 12–14 px für Inline-Metadaten. Icon-only-Buttons erhalten Tooltips und verständliche Bezeichnungen, wo das Plattform-Backend sie ausgeben kann.
-- **Bewegung** 120–180 ms für Hover/Fokus und ca. 160–200 ms für Overlays. Arbeitsflächen und Tabellen bleiben bei Datenänderungen stabil. Bei reduzierter Bewegung Übergänge unmittelbar ausführen.
+- **UI font** Inter, 14 px by default, 13 px for dense controls, 11–12 px for status, counters and labels. The explorer heading in capitals with slightly increased letter spacing. Platform font as a fallback.
+- **Mono** JetBrains Mono, 13 px for SQL and data values, 12 px for table names and technical metadata. Platform monospace as a fallback. Editor line height approx. 24 px.
+- **Outlines** 1 px. Radii 6–8 px for fields and buttons, 10–12 px for cards and menus, 16 px for dialogs. The result grid and the shell have square, continuous edges.
+- **Icons** 16–18 px for navigation and actions, 12–14 px for inline metadata. Icon-only buttons get tooltips and understandable labels where the platform backend can output them.
+- **Motion** 120–180 ms for hover/focus and approx. 160–200 ms for overlays. Work surfaces and tables stay stable on data changes. With reduced motion, perform transitions immediately.
 
-### Theme-System
+### Theme system
 
-`ui/theme.rs` definiert `ThemePreset` für gespeicherte Eingaben und `ThemeTokens` für aufgelöste semantische Farben. Der App-Kontext hält das aktive Theme als GPUI-`Global`. Ein Theme-Wechsel aktualisiert diesen Zustand und invalidiert die betroffenen Ansichten. Aktive Tabs, Fokus, Scrollposition und Editorinhalt bleiben erhalten.
+`ui/theme.rs` defines `ThemePreset` for saved inputs and `ThemeTokens` for resolved semantic colors. The app context holds the active theme as a GPUI `Global`. A theme change updates this state and invalidates the affected views. Active tabs, focus, scroll position and editor content are preserved.
 
-Der Referenzzustand ist **DBWarden Dunkel**. Weitere Presets aus der Vorlage können als **Mitternacht**, **Wald**, **Sonnenuntergang**, **Rosé** und **Hell** übernommen werden. Dunkle und helle Presets lösen ihre Oberflächen und Textfarben getrennt auf. Bei einem benutzerdefinierten Akzent die Vordergrundfarbe aus dem Kontrast gegen die tatsächliche Akzentfläche ableiten. Eigene Themes und Presets werden über stabile IDs in den lokalen UI-Einstellungen gespeichert.
+The reference state is **DBWarden Dark**. Further presets from the template can be adopted as **Midnight**, **Forest**, **Sunset**, **Rosé** and **Light**. Dark and light presets resolve their surfaces and text colors separately. With a custom accent, derive the foreground color from the contrast against the actual accent surface. Custom themes and presets are stored through stable IDs in the local UI settings.
 
-## 4. Arbeitsflächen und Komponenten
+## 4. Work surfaces and components
 
-### Sidebar und Explorer
+### Sidebar and explorer
 
-- Navigation in dieser Reihenfolge **Verbindungen**, **SQL-Arbeitsbereich**, **Verlauf**. Einträge 40 px hoch, mit Icon links und optionalem Zähler rechts. Aktive Navigation hat eine getönte Fläche und Sky-Text. Hover und Tastaturfokus sind getrennte Zustände.
-- Explorer enthält Überschrift und Aktualisieren, Verbindungszeile mit Statuspunkt, Suche und einen einrückbaren Schema-/Tabellenbaum. Demo zeigt **MariaDB · Demo** und das geöffnete Schema **bookshop**. Suche filtert Tabellennamen und lässt passende Elternknoten sichtbar.
-- Pfeiltasten bewegen den Fokus im Baum. Rechts öffnet einen Knoten, links schließt ihn oder wechselt zum Elternknoten. Enter aktiviert die fokussierte Zeile. Ladezustand, Verbindungsfehler und leere Trefferliste erhalten eigene Beschriftungen.
-- Unten stehen **Verbindung trennen**, **Einstellungen** und **Lokaler Arbeitsbereich** mit der Unterzeile **Auf deinem Gerät**. Im Demo-Modus beendet die Verbindungsaktion die lokale Demo-Session.
+- Navigation in this order: **Connections**, **SQL workspace**, **History**. Entries 40 px high, with an icon on the left and an optional counter on the right. Active navigation has a tinted surface and sky text. Hover and keyboard focus are separate states.
+- The explorer contains a heading and refresh, a connection row with a status dot, search and an indentable schema/table tree. The demo shows **MariaDB · Demo** and the open schema **bookshop**. Search filters table names and keeps matching parent nodes visible.
+- Arrow keys move the focus in the tree. Right opens a node, left closes it or moves to the parent node. Enter activates the focused row. The loading state, connection errors and an empty hit list get their own labels.
+- At the bottom are **Disconnect**, **Settings** and **Local workspace** with the subline **On your device**. In demo mode, the connection action ends the local demo session.
 
-### SQL-Editor und Tabs
+### SQL editor and tabs
 
-- Tabs behalten Text, Auswahl, Cursor, Scrollposition, Schema und letztes Ergebnis pro Dokument. Neue Tabs erhalten fortlaufende Namen. Ein dirty markierter Tab mit ungesichertem Inhalt braucht eine Schließen-Bestätigung. Nach dem Schließen wandert der Fokus zum benachbarten Tab oder zum leeren Arbeitsbereich.
-- Der native mehrzeilige Editor unterstützt Texteingabe inklusive IME, Auswahl, Kopieren/Einfügen, Undo/Redo, vertikalen und horizontalen Scroll sowie sichtbare Zeilennummern. Als Minimal-Highlighting gelten SQL-Keywords, Kommentare, Strings und Zahlen. Die Highlighting-Schicht verändert den Dokumenttext und seine Auswahlpositionen nicht.
-- **Ausführen** verwendet bei aktiver Textauswahl diese Auswahl, andernfalls den gesamten Inhalt des aktiven Tabs. Standardshortcut **Strg+Enter** auf Windows/Linux und **⌘+Enter** auf macOS, im Button passend angezeigt. Leeres SQL deaktiviert die Aktion. Während einer laufenden Abfrage zeigt die Oberfläche den Laufzustand und bietet **Abbrechen** an, sofern der Datenpfad Abbruch unterstützt.
-- Ergebnisse gehören zur auslösenden Tab- und Request-ID. Eine verspätete Antwort aktualisiert nur die zugehörige, noch aktuelle Anfrage. Ein Tabwechsel während der Abfrage blockiert die Oberfläche nicht.
+- Tabs keep text, selection, cursor, scroll position, schema and the last result per document. New tabs get consecutive names. A tab marked dirty with unsaved content needs a confirmation on closing. After closing, the focus moves to the neighboring tab or to the empty workspace.
+- The native multi-line editor supports text input including IME, selection, copy/paste, undo/redo, vertical and horizontal scrolling and visible line numbers. Minimal highlighting covers SQL keywords, comments, strings and numbers. The highlighting layer does not change the document text or its selection positions.
+- **Run** uses the selection when text is selected, and otherwise the entire content of the active tab. The default shortcut is **Ctrl+Enter** on Windows/Linux and **⌘+Enter** on macOS, displayed appropriately in the button. Empty SQL disables the action. While a query is running, the interface shows the running state and offers **Cancel**, provided the data path supports cancellation.
+- Results belong to the triggering tab and request ID. A late response only updates the associated, still current request. Switching tabs during the query does not block the interface.
 
-### Ergebnisraster
+### Result grid
 
-- Kopfzeile mit schmaler Zeilennummernspalte `#`, danach Spaltenname plus leiser SQL-Typ. Demo-Reihenfolge `id INT`, `title VARCHAR`, `author_id INT`, `price DECIMAL`, `stock INT`. Der Titel erhält den größten Platz. Werte bleiben einzeilig, lange Zellwerte sind vollständig einsehbar und kopierbar.
-- **Ergebnis filtern …** filtert lokal die bereits geladenen Zeilen. Bei aktivem Filter zeigt der Footer Treffer und geladene Gesamtzahl. Die Kopieraktion übernimmt die Zellenauswahl, andernfalls die sichtbare gefilterte Ergebnismenge als TSV mit Spaltenköpfen. SQL-`NULL` ist sichtbar von leeren Strings unterscheidbar.
-- Leeres Resultset, kein Filtertreffer, laufende Abfrage, Abbruch und SQL-Fehler haben unterscheidbare Zustände. Ein Ergebnislimit oder eine Teilmenge wird im Status als solche ausgewiesen. Bei großen Ergebnissen nur sichtbare Zeilen und einen kleinen Puffer rendern. Datenmenge und Filterarbeit begrenzen oder aus dem UI-Thread auslagern.
+- A header row with a narrow row-number column `#`, followed by the column name plus a quiet SQL type. Demo order `id INT`, `title VARCHAR`, `author_id INT`, `price DECIMAL`, `stock INT`. The title gets the most space. Values stay single-line, and long cell values can be viewed and copied in full.
+- **Filter result …** filters the already loaded rows locally. With an active filter, the footer shows hits and the total number loaded. The copy action takes the cell selection, and otherwise the visible filtered result set as TSV with column headers. SQL `NULL` is visibly distinguishable from empty strings.
+- An empty result set, no filter hit, a running query, cancellation and an SQL error have distinguishable states. A result limit or a subset is labeled as such in the status. For large results, render only the visible rows and a small buffer. Limit the amount of data and the filter work, or move them off the UI thread.
 
-### Verbindungen, Verlauf und Einstellungen
+### Connections, history and settings
 
-**Verbindungen** und **Verlauf** verwenden dieselbe Shell. Verbindungsprofile erscheinen als kompakte Karten mit Name, Treiber, Adresse in Monospace, beschriftetem Verbindungsstatus und Aktionen. Der Verlauf nutzt eine dichte Liste mit SQL-Vorschau, Zeit und Status. Ein Eintrag kann in einem neuen Abfrage-Tab geöffnet werden. Einstellungen nutzen beschriftete Felder, Hilfetext, Toggle-Zeilen und eine Theme-Auswahl. Passwortfelder sind standardmäßig verdeckt und haben eine beschriftete Sichtbarkeitsaktion.
+**Connections** and **History** use the same shell. Connection profiles appear as compact cards with a name, driver, address in monospace, a labeled connection status and actions. The history uses a dense list with an SQL preview, time and status. An entry can be opened in a new query tab. Settings use labeled fields, help text, toggle rows and a theme selection. Password fields are hidden by default and have a labeled visibility action.
 
-### Overlays und Bedienelemente
+### Overlays and controls
 
-- Varianten für Buttons sind `Primary`, `Outline`, `Ghost` und `Danger`. Felder und Buttons sind im Arbeitsbereich 32 px, in Formularen 36 px hoch. Hover, gedrückter Zustand, deaktivierter Zustand und sichtbarer 2-px-Tastaturfokus sind separat gestaltet.
-- Dialoge liegen zentriert auf einem gedimmten Overlay. Standardbreite bis 512 px, Kopf und Footer bleiben sichtbar, Body scrollt bei Bedarf. Rechte Detail-Drawer sind bis 560 px breit. Modale Overlays binden den Fokus, Escape schließt die oberste Ebene und der Fokus kehrt zum Auslöser zurück. Klick außerhalb schließt nur, wenn dadurch keine Eingabe verloren geht.
-- Kontextmenüs öffnen am Auslöser oder Zeiger, bleiben mit 8 px Rand im Fenster und unterstützen Pfeiltasten, Enter und Escape. Toasts liegen unten rechts über der Statusleiste. Fehler, die eine Handlung verlangen, erscheinen zusätzlich am betroffenen Bereich.
-- Deutsche UI-Texte, SQL-Begriffe und Treibernamen im Original. Status über Text und/oder Symbol vermitteln, Farbe dient als zusätzliche Hilfe.
+- Button variants are `Primary`, `Outline`, `Ghost` and `Danger`. Fields and buttons are 32 px high in the workspace and 36 px in forms. Hover, pressed state, disabled state and a visible 2 px keyboard focus are designed separately.
+- Dialogs sit centered on a dimmed overlay. Default width up to 512 px, header and footer stay visible, and the body scrolls when needed. Right detail drawers are up to 560 px wide. Modal overlays trap the focus, Escape closes the topmost layer and the focus returns to the trigger. A click outside only closes if no input is lost by doing so.
+- Context menus open at the trigger or pointer, stay inside the window with an 8 px margin and support arrow keys, Enter and Escape. Toasts sit at the bottom right above the status bar. Errors that require an action additionally appear in the affected area.
+- Interface text is in German, SQL terms and driver names in the original. Convey status through text and/or a symbol; color serves as additional help.
 
-## 5. Reproduzierbarer Demo-Start
+## 5. Reproducible demo start
 
-Die App startet für die Designabnahme direkt im **SQL-Arbeitsbereich** mit **MariaDB · Demo**, aktivem **Lesemodus**, Schema **bookshop** und Tab **Abfrage 1**. Explorer und Ergebnis werden aus lokalen Fixtures aufgebaut. Die Statusleiste meldet **Demo · kein Server verbunden**. Die Referenzwerte **6 Zeilen** und **3 ms** sind Demo-Metadaten. Live-Zeilenanzahl und Laufzeit kommen später vom tatsächlichen Abfrageergebnis.
+For the design acceptance, the app starts directly in the **SQL workspace** with **MariaDB · Demo**, active **Read mode**, the schema **bookshop** and the tab **Query 1**. The explorer and the result are built from local fixtures. The status bar reports **Demo · no server connected**. The reference values **6 rows** and **3 ms** are demo metadata. The live row count and runtime come later from the actual query result.
 
 ```sql
--- Beispieldaten · kein Server verbunden
+-- Sample data · no server connected
 
 SELECT * FROM books
 LIMIT 100;
 ```
 
-Die Tabelle zeigt die sechs Buchzeilen der Demo. Sichtbare Titel aus der Referenz sind **The Design of Everyday Things**, **A Philosophy of Software Design**, **Designing Data-Intensive Applications**, **Refactoring UI**, **The Pragmatic Programmer** und **Clean Architecture**. Der Fokus liegt beim Start auf einem stabilen Referenzzustand mit bereits sichtbarem Ergebnis. Ausführen, Suche, Filter, Kopieren, Tabs und Splitter lassen sich lokal bedienen.
+The table shows the six book rows of the demo. Visible titles from the reference are **The Design of Everyday Things**, **A Philosophy of Software Design**, **Designing Data-Intensive Applications**, **Refactoring UI**, **The Pragmatic Programmer** and **Clean Architecture**. On start, the focus is on a stable reference state with an already visible result. Run, search, filter, copy, tabs and the splitter can be operated locally.
 
-## 6. Vorgeschlagene Code-Struktur
+## 6. Proposed code structure
 
 ```text
 src/
-  main.rs                  Fensterstart, Assets, Keybindings
+  main.rs                  window start, assets, key bindings
   ui/
-    theme.rs               Presets, Tokens und aktives Theme
-    shell.rs               Titel, Sidebar, Hauptbereich und Status
-    components/            Buttons, Felder, Badges und Overlays
-    views/                 Explorer, Editor, Ergebnisse und weitere Ansichten
-  workspace.rs             Tabs, Sessions und Abfragezustand
-  demo.rs                  Lokale Demo-Daten und Demo-Ausführung
+    theme.rs               presets, tokens and the active theme
+    shell.rs               title, sidebar, main area and status
+    components/            buttons, fields, badges and overlays
+    views/                 explorer, editor, results and further views
+  workspace.rs             tabs, sessions and query state
+  demo.rs                  local demo data and demo execution
 assets/
   icons/
   fonts/
 ```
 
-Zuerst Shell und Theme aufbauen, dann SQL-Ansicht mit Demo-Fixtures, danach Eingabe, Aktionen und wiederverwendbare Overlays. Views rendern aus dem Workspace-Zustand. Abfrageausführung läuft außerhalb des Renderpfads und liefert ein typisiertes Ergebnis zurück. Eine echte MariaDB-Anbindung ist ein eigener Umsetzungsschritt. Für eine spätere echte Verbindung muss der Lesemodus über den Ausführungspfad und Datenbankberechtigungen durchgesetzt werden.
+First build the shell and the theme, then the SQL view with demo fixtures, then input, actions and reusable overlays. Views render from the workspace state. Query execution runs outside the render path and returns a typed result. A real MariaDB integration is a separate implementation step. For a later real connection, read mode must be enforced through the execution path and database permissions.
 
-## 7. Abnahme
+## 7. Acceptance
 
-- `cargo fmt --check`, `cargo check --locked` und `cargo build --locked` laufen durch. Die native App startet auf der festgelegten Referenzplattform.
-- Bei 1280 × 720 stimmen visuelle Hierarchie, Sidebar-Breite, Zeilenhöhen, Splitterlage und Ergebnisraster mit der Referenz überein. Betriebssystem-Fensterdekorationen und Font-Rendering dürfen plattformbedingt abweichen.
-- Bei kleinerem Fenster und erhöhter Skalierung bleiben Navigation, Ausführen, Editor und Ergebnis erreichbar. Scrollbereiche und Splitter konkurrieren nicht um den Fokus oder dieselbe Scrollposition.
-- Tastaturprüfung umfasst Navigation, Eingabefokus, Textauswahl, Ausführen, Tabwechsel, Ergebniskopie und Escape in Dialogen. Theme-Wechsel bewahrt den Arbeitszustand.
-- Demo-Ergebnis mit sechs Zeilen, Nulltreffer, Fehler- und Ladezustand sowie ein größeres Resultset zur Kontrolle des Scrollverhaltens manuell prüfen.
+- `cargo fmt --check`, `cargo check --locked` and `cargo build --locked` run through. The native app starts on the defined reference platform.
+- At 1280 × 720, the visual hierarchy, sidebar width, row heights, splitter position and result grid match the reference. Operating system window decorations and font rendering may differ depending on the platform.
+- In a smaller window and with increased scaling, navigation, run, editor and result stay reachable. Scroll areas and the splitter do not compete for the focus or the same scroll position.
+- The keyboard check covers navigation, input focus, text selection, run, tab switching, result copy and Escape in dialogs. A theme change preserves the working state.
+- Manually check the demo result with six rows, zero hits, the error and loading states and a larger result set to verify the scrolling behavior.
 
-## Technische Referenzen
+## Technical references
 
-- [GPUI – Einstieg und Beispiele](https://gpui.rs/)
-- [GPUI – API-Referenz](https://docs.rs/gpui/latest/gpui/)
-- [Zed – natives GPUI-Textinput-Beispiel](https://github.com/zed-industries/zed/blob/main/crates/gpui/examples/input.rs)
-- [GPUI Kit – Table und DataTable im Vergleich](https://gpui-kit.com/component/table/)
+- [GPUI – introduction and examples](https://gpui.rs/)
+- [GPUI – API reference](https://docs.rs/gpui/latest/gpui/)
+- [Zed – native GPUI text input example](https://github.com/zed-industries/zed/blob/main/crates/gpui/examples/input.rs)
+- [GPUI Kit – Table vs. DataTable comparison](https://gpui-kit.com/component/table/)

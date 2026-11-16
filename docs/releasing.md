@@ -1,7 +1,7 @@
-# Release und Auto-Update
+# Releases and auto-update
 
-Der verbindliche Ablauf steht in [windows-release.md](windows-release.md): Änderungen unter `Unreleased` sammeln, mit `python scripts/release.py prepare x.y.z` eine Version vorbereiten, den PR prüfen und zusammenführen, dann den Release-Workflow auf `main` mit dieser Version starten.
+The binding procedure is in [windows-release.md](windows-release.md): collect changes under `Unreleased`, prepare a version with `python scripts/release.py prepare x.y.z`, review and merge the pull request, then start the release workflow on `main` with that version.
 
-Der Workflow baut und prüft den Installer und erzeugt einen signierten **Draft Release**. Erst nach Prüfung der Dateien und Notizen auf GitHub veröffentlichen. Der lokale Build und Upload bleiben über `scripts/build-installer.ps1` und `scripts/publish-release.ps1` möglich; Parameter und Signierschlüssel-Verwaltung sind in der Release-Anleitung beschrieben.
+The workflow builds and verifies the installer and creates a signed **draft release**. Only publish it on GitHub after checking the files and notes. The local build and upload remain possible through `scripts/build-installer.ps1` and `scripts/publish-release.ps1`; the parameters and the signing key management are described in the release guide.
 
-Der Updater ist nur aktiv, wenn beim Build Endpunkt und öffentlicher Schlüssel gesetzt sind. Der private Schlüssel bleibt außerhalb des Quellcodes. Veröffentlichte Versionen werden nicht überschrieben.
+The updater is only active if the endpoint and the public key were set at build time. The private key stays outside the source code. Published versions are never overwritten.
