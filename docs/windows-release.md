@@ -2,6 +2,8 @@
 
 ## Aktueller Stand
 
+**Version 1.1.0 ist veröffentlicht:** [Release](https://github.com/BungeeDEV/note-warden/releases/tag/v1.1.0) · [Windows-Setup](https://github.com/BungeeDEV/note-warden/releases/download/v1.1.0/NoteWarden-1.1.0-setup.exe). Der [endgültige CI-Lauf](https://github.com/BungeeDEV/note-warden/actions/runs/43859880740) hat Formatierung, Clippy, 37 Tests, offizielle Minisign-Prüfung, Setup-Build, Erstinstallation, erneute Installation und datenerhaltende Deinstallation bestanden. Nach Veröffentlichung hat der tatsächliche Rust-Updater das öffentliche Manifest und den Installer erfolgreich geladen und dessen Signatur geprüft.
+
 Das öffentliche Projekt- und Release-Repository ist **[BungeeDEV/note-warden](https://github.com/BungeeDEV/note-warden)**. Der Nutzer hat die Veröffentlichung des App-Quellcodes freigegeben. Persönliche Entwicklungsdaten, Arbeitsdaten und private Schlüssel sind ausgeschlossen; `.claude` verweist auf persönliche Entwicklungsdaten und wird nicht hochgeladen.
 
 Der lokale Setup-Compiler konnte aufgrund einer automatischen Freigabeablehnung nicht eingerichtet werden. Der reproduzierbare Installer-Build läuft deshalb auf GitHubs `windows-2025`-Runner mit vorhandenem Inno Setup. Der Workflow erstellt zunächst einen Entwurf, der vor der Veröffentlichung geprüft wird. Der Status steht unter [Actions](https://github.com/BungeeDEV/note-warden/actions).
@@ -80,8 +82,10 @@ Der fest eingebettete Endpunkt ist `https://github.com/<owner>/<repo>/releases/l
 
 ## Noch ausstehende Abnahme
 
-Erstinstallation und ein echter Wechsel von einer älteren Installation müssen mit Testdaten geprüft werden: eigenes Installationsziel, laufende App/Tray, Abbruch, fehlgeschlagenes Backup, Downloadfehler, ungültige Signatur, Neustart und Datenerhalt. Das Repository, der GitHub-Endpunkt und das Release-Schlüsselpaar sind eingerichtet. Setup-Kompilation und Artefaktprüfung werden durch den Release-Workflow ausgeführt.
+Erstinstallation, erneute Installation am selben benutzerdefinierten Pfad, Payload-Prüfsummen, Laufzeitdateien und datenerhaltende Deinstallation wurden auf einem frischen CI-Rechner erfolgreich geprüft. Der öffentliche Download und die Signaturprüfung wurden danach mit dem tatsächlichen Updater-Code geprüft. Ein vollständiger Wechsel zwischen zwei unterschiedlichen veröffentlichten App-Versionen einschließlich laufender App/Tray und automatischem Neustart steht noch aus. Die Backup- und Signaturfehlerpfade sind zusätzlich durch die vorhandenen Tests abgedeckt.
 
 Die Updater-Tests decken gültige Signaturen, manipulierte Downloads, ungültige Schlüssel/Signaturen, unsichere Versionsnamen und HTTP-Adressen ab. Netzwerkzugriffe sind auf HTTPS begrenzt; Manifest und Installer besitzen Größenlimits. Zusätzlich wird das tatsächliche Release-Schlüsselpaar anhand einer veröffentlichten Testsignatur geprüft. Die PowerShell-Skripte sind syntaktisch geprüft; ihre Ausführung erfolgt im Release-Workflow.
 
 Die explizite Neustart-Aktion des Setups verwendet den dokumentierten [Inno-Update-Modus](https://jrsoftware.org/inno-setup/documentation/topic_technotes.htm); sie setzt keine Windows-Restart-Manager-Registrierung voraus, die [RestartApplications](https://jrsoftware.org/ishelp/topic_setup_restartapplications.htm) sonst benötigt.
+
+Wenn während eines Release-Builds Änderungen an `.github/workflows/` auf den Hauptzweig gepusht werden, kann GitHub das Erstellen eines Tags auf dem älteren Commit mit dem eingeschränkten CI-Token ablehnen. In diesem Fall den Workflow auf dem aktuellen Hauptzweig erneut starten. Veröffentlichte Release-Dateien werden vom Skript niemals ersetzt; vor einem weiteren Release muss die Version erhöht werden.

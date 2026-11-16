@@ -50,4 +50,4 @@ Diese Prüflücke verhindert die Aussage, dass sämtliche visuellen Fehler der g
 
 ## Ergänzung: Installer und GitHub-Updates
 
-In der anschließenden Distributionsarbeit wurden ein optimierter Windows-Build, Setup-/Release-Skripte und zusätzliche Updater-Prüfungen ergänzt. Es bestehen jetzt 36 Tests. Setup-Compiler, öffentliches Download-Repository und Release-Schlüssel sind noch nicht eingerichtet; es wurde kein Setup oder Online-Update veröffentlicht. Aktueller Ablauf und Grenzen: [Windows-Releases](windows-release.md). Die oben genannte visuelle Abnahme bleibt offen.
+Version 1.1.0 ist im öffentlichen Repository veröffentlicht. Der Installer wurde auf GitHub gebaut und signiert; Erstinstallation, erneute Installation und datenerhaltende Deinstallation haben den CI-Test bestanden. Die 37 regulären Tests bestehen. Der zusätzliche Online-Test hat nach Veröffentlichung das echte Manifest und Setup geladen und deren Signatur geprüft. Desktop-Live-Tests und dabei behobene Fehler stehen in der Aktualisierung oben. Aktueller Ablauf und Grenzen: [Windows-Releases](windows-release.md).
