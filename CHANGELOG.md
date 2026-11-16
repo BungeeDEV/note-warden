@@ -1,5 +1,17 @@
 ## Unreleased
 
+### Added
+* Notizzettel: Eigenes kleines Fenster ohne Titelleiste im Stil von Windows Sticky Notes, das neben dem Hauptfenster geöffnet bleibt. Es zeigt die Updates als Karten, darunter die Post-its, und bietet Suche, Editor, Aufgaben, Anheften („immer im Vordergrund“) und Schließen. Öffnen mit Strg+Umschalt+M, über die Seitenleiste, den Tray oder die Befehlspalette; beim nächsten Start öffnet es sich wieder, wenn es zuletzt offen war. Beide Fenster gleichen ihre Änderungen automatisch ab.
+* Post-its: Kleine farbige Notizen zum Sortieren per Drag & Drop, Farbwechsel, Löschen mit Rückgängig und eigener Ansicht „Post-its“ in der Seitenleiste.
+* Tags: Updates und deren Aufgaben lassen sich taggen (Eingabefeld im Detail, `#tag` in Aufgaben, Vorschläge vorhandener Tags). Tags erscheinen als farbige Chips in Liste, Board und Notizzettel, bilden einen Abschnitt „Tags“ in der Seitenleiste und lassen sich als Filter nutzen. Die Suche findet Tags auch mit `#`.
+* Post-its tragen Tags: `#tag` im Text wird beim Verlassen zum Chip; ein Klick auf den Chip filtert die Post-its.
+* Portabler Modus: Eine leere Datei `.portable` neben der `Note Warden.exe` legt alle Daten in `Data/` daneben ab. Der automatische Updater ist dort ausgeschaltet.
+* Einstellungen → Darstellung → Seitenleiste: Inbox, Board, Post-its, Releases und Kalender lassen sich ausblenden.
+* Update-Liste: Die Leertaste setzt das ausgewählte Update auf erledigt oder öffnet es wieder.
+
+### Changed
+* Updates ohne Titel zeigen in Listen, Board, Tooltips und Schnellerfassung die erste Textzeile statt „Ohne Titel“.
+
 ### Maintenance
 * Automatische PR-Prüfungen für Windows, Installer, Rust, UI und Release-Metadaten sowie ein dokumentierter GitHub-Workflow.
 * Release-Vorbereitung mit synchronisierten Versionsdateien und geprüftem Draft-Release vom Hauptzweig.

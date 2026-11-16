@@ -30,6 +30,8 @@ Der Arbeitsbereich liegt als JSON-Datei unter Windows normalerweise in `%LOCALAP
 
 Wenn die Hauptdatei fehlt, kann die Sicherung automatisch wiederhergestellt werden. Ist die Hauptdatei unlesbar, sperrt die App Änderungen und zeigt einen Fehler. **Sicherung wiederherstellen** nutzt die Sicherung ausdrücklich; die beschädigte Datei bleibt mit dem Zusatz `.corrupt-…` erhalten. Ältere Arbeitsbereiche werden beim ersten Start auf Schema 8 migriert; vorher entsteht einmalig `workspace.json.bak-0.2.0` (0.1/0.2) bzw. `workspace.json.bak-0.3.0`. Gelöschte Updates liegen standardmäßig 30 Tage im Papierkorb (einstellbar). Theme, Akzent und Fenstergröße stehen zusätzlich in `prefs.json` neben der Datendatei. Für Entwicklungstests kann `NOTE_WARDEN_DATA_DIR` auf ein anderes Datenverzeichnis und `NOTE_WARDEN_WINDOW_SIZE` etwa auf `800x600` gesetzt werden.
 
+Portabler Modus: Eine leere Datei `.portable` neben der `Note Warden.exe` lässt Note Warden alle Daten (Arbeitsbereich, Sicherungen, Protokoll) in einem Ordner `Data/` daneben ablegen, etwa für einen USB-Stick. Der automatische Updater ist in diesem Modus aus; neue Versionen werden von Hand ersetzt. `NOTE_WARDEN_DATA_DIR` hat Vorrang.
+
 Die Arbeitsdaten bleiben lokal. Erinnerungen verwenden Windows-Benachrichtigungen; Accounts und Synchronisierung sind nicht vorgesehen. Export (Markdown, Changelog, JSON-Backup) und Import liegen im Update-Menü bzw. in den Einstellungen.
 
 ## Technische Basis
