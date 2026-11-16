@@ -2627,7 +2627,11 @@ fn main() {
             KeyBinding::new("ctrl-shift-f", ToggleFocusMode, Some("NoteWarden")),
             KeyBinding::new("ctrl-n", NewUpdate, None),
             KeyBinding::new("ctrl-f", FocusSearch, None),
-            KeyBinding::new("escape", CloseOverlay, None),
+            KeyBinding::new(
+                "escape",
+                CloseOverlay,
+                Some("NoteWarden && !Popover && !PopoverContent && !PopupMenu && !AppMenuBar"),
+            ),
             KeyBinding::new("ctrl-k", OpenPalette, None),
             KeyBinding::new("ctrl-,", OpenSettings, None),
             KeyBinding::new("n", FocusQuickAdd, Some("Today && !Input")),
