@@ -85,10 +85,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repository", required=True)
     parser.add_argument("--upload", action="store_true", help="Store the key as an encrypted GitHub Actions secret")
+    parser.add_argument("--environment", default="release", help="GitHub environment for the signing secret (default: release)")
     parser.add_argument("--export", type=Path, help="Explicitly export an unencrypted Minisign key outside the project")
     args = parser.parse_args()
     if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", args.repository):
         raise RuntimeError("Invalid repository name")
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", args.environment):
+        raise RuntimeError("Invalid environment name")
     key_dir = Path(os.environ["LOCALAPPDATA"]) / "NoteWardenSigning"
     key_dir.mkdir(parents=True, exist_ok=True)
     backup = key_dir / "note-warden.key.dpapi"
@@ -116,7 +119,8 @@ def main():
             file.write(secret_text)
         print("Private key exported to the explicitly selected external file; protect that file.")
     if args.upload:
-        result = subprocess.run(["gh", "secret", "set", "NOTE_WARDEN_MINISIGN_KEY", "--repo", args.repository],
+        result = subprocess.run(["gh", "secret", "set", "NOTE_WARDEN_MINISIGN_KEY", "--repo", args.repository,
+                                 "--env", args.environment],
                                 input=secret_text, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
         if result.returncode:
             raise RuntimeError("GitHub secret upload failed; the protected local key was retained")

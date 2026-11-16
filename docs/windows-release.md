@@ -10,12 +10,15 @@ Der lokale Setup-Compiler konnte aufgrund einer automatischen Freigabeablehnung 
 
 ## Normaler Release-Ablauf auf GitHub
 
-1. Version und Changelog im Quellcode aktualisieren und die Änderungen pushen.
-2. Den Workflow **Windows installer release** unter Actions manuell starten, alternativ `gh workflow run release.yml --repo BungeeDEV/note-warden`.
-3. Der Workflow prüft Formatierung, Clippy, Tests und UI-Regeln. Anschließend erstellt er Setup und signierte Update-Dateien.
-4. Setup, `.minisig`, `latest.json` und Prüfsummen erscheinen in einem Draft Release. Nach Review den Entwurf veröffentlichen.
+1. Änderungen während der Entwicklung unter `## Unreleased` in `CHANGELOG.md` sammeln. Für ein Release einen Branch anlegen und beispielsweise `python scripts/release.py prepare 1.2.0` ausführen. Das Werkzeug erhöht Cargo-, npm- und README-Versionen gemeinsam, aktualisiert beide Lockfiles ohne Abhängigkeitsupdates und verschiebt die gesammelten Notizen in den neuen Versionsabschnitt. `1.2.0` ist ein Beispiel; die nächste passende Version wählen.
+2. `./scripts/check.ps1` ausführen, den Diff prüfen und einen Pull Request öffnen. Nach erfolgreicher CI und Review per Squash in `main` übernehmen.
+3. Den Workflow **Windows installer release** auf dem aktuellen **main** starten und die vorbereitete Version eingeben, alternativ `gh workflow run release.yml --ref main --repo BungeeDEV/note-warden -f version=1.2.0`.
+4. Der Workflow lehnt abweichende Versionsangaben, andere Branches, einen inzwischen veränderten Hauptzweig und bereits veröffentlichte Versionen vor dem Signieren ab. Er führt die vollständige CI einschließlich Installer-Test erneut aus und erstellt danach in der auf `main` beschränkten Umgebung `release` das signierte Setup. PR-Prüfungen benötigen keinen Signierschlüssel. CI- und Release-Caches sind getrennt.
+5. Setup, `.minisig`, `latest.json` und Prüfsummen erscheinen in einem **Draft Release**. Im Actions-Artefakt und im Entwurf Dateien und Release-Notizen prüfen. Erst dann den Entwurf auf GitHub veröffentlichen. Unveränderliche Releases schützen danach Assets und Tag; Korrekturen benötigen eine neue Version. Der Updater sieht Entwürfe nicht.
 
-Der Workflow verwendet `installer/update-signing.pub` und das Actions-Secret `NOTE_WARDEN_MINISIGN_KEY`. Der öffentliche Schlüssel ist fest im jeweiligen Release-Build eingebettet. Der private Schlüssel wird nur auf dem kurzlebigen Runner in eine temporäre Datei geschrieben und danach entfernt.
+Die Versionsnummer folgt SemVer: Patch für kompatible Fehlerkorrekturen, Minor für kompatible neue Funktionen und Major für inkompatible Änderungen. Die Automatisierung veröffentlicht keine Releases beim normalen Push oder Merge. Die Konfiguration für automatisch generierte GitHub-Notizen liegt in `.github/release.yml`; die ausgelieferten App-Notizen stammen aus dem geprüften Versionsabschnitt in `CHANGELOG.md`.
+
+Der Workflow verwendet `installer/update-signing.pub` und das Environment-Secret `NOTE_WARDEN_MINISIGN_KEY` in der GitHub-Umgebung `release`. Diese erlaubt nur den Branch `main`. Der öffentliche Schlüssel ist fest im jeweiligen Release-Build eingebettet. Der private Schlüssel wird nur auf dem kurzlebigen Runner in eine temporäre Datei geschrieben und danach entfernt. `python scripts/manage-release-key.py --repository BungeeDEV/note-warden --upload` hinterlegt die bestehende lokale Schlüsselkopie standardmäßig in dieser Umgebung; bei einer Neueinrichtung zuerst `scripts/configure-github.ps1 -Apply` ausführen.
 
 Eine zusätzliche lokale Schlüsselkopie liegt durch Windows DPAPI verschlüsselt außerhalb des Projekts unter `%LOCALAPPDATA%\NoteWardenSigning\note-warden.key.dpapi`. Sie ist an das aktuelle Windows-Benutzerprofil gebunden. Vor einem Rechnerwechsel muss eine separate, geschützte Schlüssel-Sicherung angelegt werden. `scripts/manage-release-key.py` kann die vorhandene Kopie erneut als GitHub-Secret hinterlegen, ohne einen neuen Schlüssel zu erzeugen. Ein bewusst angeforderter `--export` schreibt einen unverschlüsselten Minisign-Schlüssel ausschließlich außerhalb des Projekts; eine solche Exportdatei muss anschließend separat geschützt werden.
 

@@ -1,0 +1,12 @@
+changelog:
+  exclude:
+    labels: [duplicate, invalid, wontfix]
+  categories:
+    - title: Fehlerbehebungen
+      labels: [bug]
+    - title: Verbesserungen
+      labels: [enhancement, accessibility]
+    - title: Dokumentation
+      labels: [documentation]
+    - title: Weitere Änderungen
+      labels: ['*']

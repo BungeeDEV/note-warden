@@ -10,6 +10,13 @@ $manifestPath = Join-Path $ArtifactDirectory 'latest.json'
 $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
 $version = $manifest.version
 if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid update version.' }
+$repoRoot = Split-Path -Parent $PSScriptRoot
+$metadataText = & cargo metadata --manifest-path (Join-Path $repoRoot 'Cargo.toml') --locked --format-version 1 --no-deps
+if ($LASTEXITCODE) { throw 'Cannot read source version.' }
+$sourceVersion = (($metadataText | ConvertFrom-Json).packages | Where-Object { $_.name -eq 'note-warden' }).version
+if ($sourceVersion -cne $version) { throw 'Artifact version differs from the source version. Rebuild before publishing.' }
+$sourceChanges = & git -C $repoRoot status --porcelain
+if ($LASTEXITCODE -or $sourceChanges) { throw 'Commit all source changes before building and publishing a release.' }
 $installerName = "NoteWarden-$version-setup.exe"
 $expectedUrl = "https://github.com/$GitHubRepository/releases/download/v$version/$installerName"
 if ($manifest.url -cne $expectedUrl) { throw 'The artifacts were built for a different repository. Rebuild with the intended repository.' }
@@ -42,6 +49,9 @@ if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect existing releases.' }
 $existing = $releaseList | ConvertFrom-Json | Where-Object { $_.tagName -eq "v$version" } | Select-Object -First 1
 if ($existing) {
     if (-not $existing.isDraft) { throw 'This version is already published. Bump the version; published assets are never replaced.' }
+    $draftJson = & gh release view "v$version" --repo $GitHubRepository --json targetCommitish
+    if ($LASTEXITCODE) { throw 'Cannot identify the existing draft source commit.' }
+    if (($draftJson | ConvertFrom-Json).targetCommitish -cne $commit) { throw 'This draft belongs to a different source commit. Inspect and remove the obsolete draft before rebuilding it.' }
     & gh release upload "v$version" @files --repo $GitHubRepository --clobber
     if ($LASTEXITCODE -ne 0) { throw 'Updating draft artifacts failed.' }
     & gh release edit "v$version" --repo $GitHubRepository --target $commit --title "Note Warden $version" --notes-file $notesPath
