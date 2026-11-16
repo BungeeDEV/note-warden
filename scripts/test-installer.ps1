@@ -1,5 +1,8 @@
 [CmdletBinding()]
-param()
+param(
+    [ValidateSet('github', 'local')]
+    [string]$Channel = 'github'
+)
 $ErrorActionPreference = 'Stop'
 if ($env:GITHUB_ACTIONS -ne 'true') {
     throw 'This installation smoke test runs only on an ephemeral GitHub Actions runner.'
@@ -8,7 +11,7 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $metadata = (& cargo metadata --locked --format-version 1 --no-deps) | ConvertFrom-Json
 if ($LASTEXITCODE -ne 0) { throw 'Cannot read package metadata.' }
 $version = ($metadata.packages | Where-Object { $_.name -eq 'note-warden' } | Select-Object -First 1).version
-$setup = Join-Path $metadata.target_directory "installer\github\NoteWarden-$version-setup.exe"
+$setup = Join-Path $metadata.target_directory "installer\$Channel\NoteWarden-$version-setup.exe"
 $installDir = Join-Path $env:RUNNER_TEMP 'Note Warden Install Test'
 $dataDir = Join-Path $env:LOCALAPPDATA 'Note Warden\Note Warden\data'
 New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
@@ -23,7 +26,7 @@ for ($pass = 1; $pass -le 2; $pass++) {
     $binary = Join-Path $installDir 'note-warden.exe'
     $expectedHash = (Get-FileHash -LiteralPath (Join-Path $metadata.target_directory 'release\note-warden.exe') -Algorithm SHA256).Hash
     if ((Get-FileHash -LiteralPath $binary -Algorithm SHA256).Hash -ne $expectedHash) {
-        throw 'Installed binary differs from the signed release payload.'
+        throw 'Installed binary differs from the build payload.'
     }
     foreach ($name in @('vcruntime140.dll', 'LICENSE-LUCIDE.txt', 'unins000.exe')) {
         if (-not (Test-Path -LiteralPath (Join-Path $installDir $name))) { throw "Installed file missing: $name" }

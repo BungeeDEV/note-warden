@@ -1,3 +1,9 @@
+## Unreleased
+
+### Maintenance
+* Automatische PR-Prüfungen für Windows, Installer, Rust, UI und Release-Metadaten sowie ein dokumentierter GitHub-Workflow.
+* Release-Vorbereitung mit synchronisierten Versionsdateien und geprüftem Draft-Release vom Hauptzweig.
+
 ## 1.1.0
 
 ### Distribution

@@ -1,5 +1,9 @@
 # Note Warden
 
+[![CI](https://github.com/BungeeDEV/note-warden/actions/workflows/ci.yml/badge.svg)](https://github.com/BungeeDEV/note-warden/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/BungeeDEV/note-warden/actions/workflows/codeql.yml/badge.svg)](https://github.com/BungeeDEV/note-warden/actions/workflows/codeql.yml)
+[![Release](https://img.shields.io/github/v/release/BungeeDEV/note-warden)](https://github.com/BungeeDEV/note-warden/releases/latest)
+
 Note Warden ist eine lokale Windows-Desktop-App für Updatepläne. Ein Update hat Status, Markdown-Notizen, Aufgaben (mit Unteraufgaben) und Termine; Updates und Aufgaben lassen sich einzeln terminieren. Version `1.1.0`, Änderungen siehe [CHANGELOG.md](CHANGELOG.md).
 
 ## Installation
@@ -34,11 +38,8 @@ Rust 2024, [GPUI](https://gpui.rs/) über GPUI Kit 0.9.1, `chrono` und JSON-Spei
 
 Branding (Logo, Icons): `npm install` und `npm run brand` erzeugen `branding/logo.svg`, `logo-small.svg`, `logo-1024.png` und `app.ico` (nur Entwicklungswerkzeug, `@resvg/resvg-js`). Das Icon wird per `build.rs` in die Exe eingebettet.
 
-Prüfen:
+Entwicklung, Pull Requests und CI: [CONTRIBUTING.md](CONTRIBUTING.md). Alle lokalen Prüfungen zusammen:
 
 ```powershell
-cargo fmt --check
-cargo clippy --locked --all-targets
-cargo test --locked
-cargo build --locked
+./scripts/check.ps1
 ```
