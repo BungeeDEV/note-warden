@@ -1,0 +1,80 @@
+name: Windows installer release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    runs-on: windows-2025
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Restore Rust build cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: windows-rust-1.95-${{ hashFiles('Cargo.lock') }}
+      - name: Check formatting, lint and tests
+        run: |
+          cargo fmt --all --check
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          cargo clippy --locked --all-targets -- -D warnings
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          cargo test --locked
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          node scripts/check-ui.mjs
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Prepare official Minisign on the ephemeral runner
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP 'minisign-0.12-win64.zip'
+          Invoke-WebRequest 'https://github.com/jedisct1/minisign/releases/download/0.12/minisign-0.12-win64.zip' -OutFile $zip
+          if ((Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash -ine '37b600344e20c19314b2e82813db2bfdcc408b77b876f7727889dbd46d539479') {
+            throw 'Minisign archive checksum mismatch'
+          }
+          $destination = Join-Path $env:RUNNER_TEMP 'minisign'
+          Expand-Archive -LiteralPath $zip -DestinationPath $destination
+          Join-Path $destination 'minisign-win64/x86_64' | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Verify release key interoperability
+        run: |
+          minisign -Vm installer/release-key-check.txt -p installer/update-signing.pub -x installer/release-key-check.txt.minisig
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Build and sign installer
+        env:
+          SIGNING_KEY: ${{ secrets.NOTE_WARDEN_MINISIGN_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:SIGNING_KEY)) { throw 'Signing secret NOTE_WARDEN_MINISIGN_KEY is missing' }
+          $keyFile = Join-Path $env:RUNNER_TEMP 'note-warden-release.key'
+          try {
+            [IO.File]::WriteAllText($keyFile, $env:SIGNING_KEY, [Text.UTF8Encoding]::new($false))
+            Remove-Item Env:SIGNING_KEY
+            ./scripts/build-installer.ps1 -GitHubRepository $env:GITHUB_REPOSITORY -PublicKeyFile installer/update-signing.pub -SigningKeyFile $keyFile
+          } finally {
+            if (Test-Path -LiteralPath $keyFile) { Remove-Item -LiteralPath $keyFile -Force }
+          }
+      - name: Upload installer artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: note-warden-windows-installer
+          path: target/installer/github/*
+          if-no-files-found: error
+          retention-days: 14
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./scripts/publish-release.ps1 -GitHubRepository $env:GITHUB_REPOSITORY

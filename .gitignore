@@ -1,0 +1,16 @@
+/target/
+*.tmp
+/.beta-test-data/
+
+/node_modules/
+
+# Release signing keys and local release configuration never belong in source control.
+*.key
+*.key.enc
+*.pfx
+*.p12
+/release.local.json
+/.claude
+/.verification-session.json
+*.dpapi
+__pycache__/

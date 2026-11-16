@@ -1,0 +1,14 @@
+{
+  "name": "note-warden-branding",
+  "private": true,
+  "version": "1.1.0",
+  "description": "Nur Werkzeuge für das Branding (Logo, Icons); die App selbst ist Rust.",
+  "type": "module",
+  "scripts": {
+    "brand": "node branding/make-logo.mjs && node branding/export.mjs",
+    "check:ui": "node scripts/check-ui.mjs"
+  },
+  "devDependencies": {
+    "@resvg/resvg-js": "2.6.2"
+  }
+}
