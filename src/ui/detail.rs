@@ -1284,6 +1284,7 @@ impl NoteWarden {
                                             .bordered(false)
                                             .aria_label("Titel des Updates")
                                             .text_size(palette::fs(palette::DETAIL_TITLE))
+                                            .line_height(relative(1.2))
                                             .font_weight(FontWeight::SEMIBOLD)
                                             .px(px(0.))
                                             .w_full()

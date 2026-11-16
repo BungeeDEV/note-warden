@@ -9,6 +9,7 @@
 ### Fixed
 * Live-Abnahme: Board-Breiten werden aus dem verfügbaren Fenster berechnet, damit lange Projektnamen die Spalten nicht verbreitern.
 * Kalender: Mindesthöhe hält Einträge und „weitere“-Aktion sichtbar; die vollständige Tagesliste besitzt eine begrenzte Scrollfläche.
+* Detail: Mehrzeilige Titel verwenden eine zur Schriftgröße passende Zeilenhöhe, damit sich große Titel nicht überlagern.
 * Zeilen: Aktionen reservieren Platz in Updates, Heute und Aufgaben; keine Verläufe oder deckenden Aktionsblöcke über Text und Datum.
 * Updates: Abgerundete äußere Ecken des Neu-Split-Buttons ohne Clipping des Fokus; kompakte Zeilen lassen dem Titel mehr Platz und zeigen Metadaten im Tooltip.
 * Listen: Schriftabhängige Zeilenhöhe und einheitliche Höhe für Gruppenköpfe in der virtualisierten Liste; Mehrfachaktionen können umbrechen.

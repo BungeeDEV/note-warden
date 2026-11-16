@@ -1,5 +1,7 @@
 # UI-Audit 1.1.0 – Stand 16. November 2026
 
+**Aktualisierung:** Die Desktop-Verbindung ist wieder verfügbar. Live-Prüfungen mit synthetischen Daten (140 Updates, lange Projektnamen, Aufgaben und Releases) wurden bei 1280×800 in Dunkel sowie 960×620 in Hell mit großer Schrift durchgeführt. Dabei wurden überbreite Board-Spalten, abgeschnittene Kalenderaktionen, eine überlaufende Tagesliste und überlappende Titelzeilen erkannt und korrigiert. Die früheren Angaben „Live-Abnahme offen“ in der folgenden Erstprüfung sind historisch. Eine vollständige Kombination aller Themes, Dichten und Schriften sowie Screenreader/Windows-Kontrastdesign bleibt weiterhin ungetestet.
+
 ## Ergebnis und Grenze der Prüfung
 
 Die vorherige Sitzung endete am Nutzungslimit während des Audits. Ihre Änderungen waren teilweise gespeichert, aber nicht abschließend geprüft. Der aktuelle Arbeitsbereich wurde als maßgeblich verwendet. Im Projektordner und seinen Eltern liegt kein Git-Repository; `git status` ist deshalb nicht verfügbar.
