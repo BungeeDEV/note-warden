@@ -68,6 +68,8 @@ jobs:
           } finally {
             if (Test-Path -LiteralPath $keyFile) { Remove-Item -LiteralPath $keyFile -Force }
           }
+      - name: Test first install, reinstall and uninstall
+        run: ./scripts/test-installer.ps1
       - name: Upload installer artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
