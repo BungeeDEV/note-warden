@@ -10,7 +10,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Cannot read package metadata.' }
 $version = ($metadata.packages | Where-Object { $_.name -eq 'note-warden' } | Select-Object -First 1).version
 $setup = Join-Path $metadata.target_directory "installer\github\NoteWarden-$version-setup.exe"
 $installDir = Join-Path $env:RUNNER_TEMP 'Note Warden Install Test'
-$dataDir = Join-Path $env:RUNNER_TEMP 'note-warden-smoke-data'
+$dataDir = Join-Path $env:LOCALAPPDATA 'Note Warden\Note Warden\data'
 New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
 $marker = Join-Path $dataDir 'preserve-data.txt'
 [IO.File]::WriteAllText($marker, 'Preserve this test data during install and uninstall.')

@@ -215,6 +215,27 @@ mod tests {
     use super::*;
 
     #[test]
+    #[ignore = "Requires the published GitHub endpoint and compile-time release URL/public key"]
+    fn published_update_download_verifies() {
+        assert!(
+            configured(),
+            "Build this test with the official update URL and public key"
+        );
+        let manifest =
+            fetch_manifest().expect("Published update manifest must be reachable and valid");
+        let info = Info {
+            version: manifest.version,
+            notes: manifest.notes,
+            url: manifest.url,
+            signature: manifest.signature,
+        };
+        let shared = Arc::new(Mutex::new(State::Idle));
+        let installer = download_and_verify(&shared, &info)
+            .expect("Official installer must download and pass signature verification");
+        assert!(installer.metadata().unwrap().len() > 0);
+    }
+
+    #[test]
     fn configured_release_key_matches_signed_fixture() {
         let public_key = include_str!("../installer/update-signing.pub")
             .lines()
