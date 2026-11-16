@@ -1,5 +1,5 @@
-//! Datumslogik: deutsche Namen, relative Beschriftung und natürliche Eingabe.
-//! Datumswerte sind immer lokale Kalendertage (`NaiveDate`), nie UTC.
+//! Date logic: German names, relative labels and natural-language input.
+//! Date values are always local calendar days (`NaiveDate`), never UTC.
 
 use crate::model::DateFormat;
 use chrono::{Datelike, Duration, NaiveDate, Weekday};
@@ -67,17 +67,17 @@ pub fn full(date: NaiveDate, format: DateFormat) -> String {
     }
 }
 
-/// Monatskürzel für Zellen und Chips ("Dez.").
+/// Month abbreviation for cells and chips ("Dez.").
 pub fn month_short(date: NaiveDate) -> &'static str {
     MONTHS_SHORT[date.month0() as usize]
 }
 
-/// "Freitag, 14. November 2026" für Tooltips.
+/// "Freitag, 14. November 2026" for tooltips.
 pub fn full_with_weekday(date: NaiveDate, format: DateFormat) -> String {
     format!("{}, {}", weekday_long(date.weekday()), full(date, format))
 }
 
-/// Kurzform für Chips: "Fr., 14. Nov." (im selben Jahr) bzw. "14. Nov. 2026".
+/// Short form for chips: "Fr., 14. Nov." (in the same year) or "14. Nov. 2026".
 fn short(date: NaiveDate, today: NaiveDate, format: DateFormat) -> String {
     match format {
         DateFormat::Iso => return date.format("%Y-%m-%d").to_string(),
@@ -97,12 +97,12 @@ fn short(date: NaiveDate, today: NaiveDate, format: DateFormat) -> String {
     }
 }
 
-/// Datums-Chip ohne relative Angaben ("Fr., 14. Nov." bzw. Datum mit Jahr).
+/// Date chip without relative wording ("Fr., 14. Nov." or the date with the year).
 pub fn absolute(date: NaiveDate, today: NaiveDate, format: DateFormat) -> String {
     short(date, today, format)
 }
 
-/// Relativer Text für Datums-Chips.
+/// Relative text for date chips.
 pub fn relative(date: NaiveDate, today: NaiveDate, format: DateFormat) -> String {
     let diff = (date - today).num_days();
     match diff {
@@ -115,7 +115,7 @@ pub fn relative(date: NaiveDate, today: NaiveDate, format: DateFormat) -> String
     }
 }
 
-/// Montag der Woche, in der `date` liegt.
+/// Monday of the week that contains `date`.
 pub fn next_monday(today: NaiveDate) -> NaiveDate {
     today + Duration::days(7 - today.weekday().num_days_from_monday() as i64)
 }
@@ -133,7 +133,7 @@ fn weekday_from_word(word: &str) -> Option<Weekday> {
     })
 }
 
-/// Nächstes Vorkommen des Wochentags, immer strikt nach heute.
+/// Next occurrence of the weekday, always strictly after today.
 fn next_weekday(today: NaiveDate, day: Weekday) -> NaiveDate {
     let mut diff =
         day.num_days_from_monday() as i64 - today.weekday().num_days_from_monday() as i64;
@@ -208,7 +208,7 @@ pub fn parse(input: &str, today: NaiveDate) -> Option<NaiveDate> {
                 NaiveDate::from_ymd_opt(year, month, day)
             }
             None => {
-                // Ohne Jahr: nächstes Vorkommen, das nicht in der Vergangenheit liegt.
+                // Without a year: the next occurrence that is not in the past.
                 let this = NaiveDate::from_ymd_opt(today.year(), month, day)?;
                 if this >= today {
                     Some(this)
@@ -221,14 +221,14 @@ pub fn parse(input: &str, today: NaiveDate) -> Option<NaiveDate> {
     None
 }
 
-/// Kalenderwochen immer aus einem lokalen Kalendertag berechnen.
+/// Always compute calendar weeks from a local calendar day.
 pub fn week_start(date: NaiveDate, start: crate::model::WeekStart) -> NaiveDate {
     date - Duration::days(start.offset(date.weekday()))
 }
 pub fn elapsed(at: i64) -> String {
     elapsed_opt(at).unwrap_or_default()
 }
-/// Vollständiges Datum mit Uhrzeit für Tooltips; `None`, wenn die Zeit fehlt.
+/// Full date with time for tooltips; `None` if the time is missing.
 pub fn full_time(at: i64) -> Option<String> {
     use chrono::{Local, TimeZone};
     if at <= 0 {
@@ -239,7 +239,7 @@ pub fn full_time(at: i64) -> Option<String> {
         .single()
         .map(|d| d.format("%d.%m.%Y, %H:%M").to_string())
 }
-/// Relative Zeitangabe oder `None`, wenn die Zeit fehlt.
+/// Relative time or `None` if the time is missing.
 pub fn elapsed_opt(at: i64) -> Option<String> {
     (at > 0).then(|| elapsed_at(at, crate::model::now_millis()))
 }
@@ -314,12 +314,12 @@ mod tests {
         use crate::model::WeekStart::{Monday, Sunday};
         // Do., 12. Nov. 2026 -> Montag 9.11.
         assert_eq!(week_start(d(2026, 11, 12), Monday), d(2026, 11, 9));
-        // Mittwoch 11.11. (früherer Fehlerfall): Woche beginnt am 9.11., nicht am 16.11.
+        // Wednesday 11.11. (earlier failure case): the week starts on 9.11., not on 16.11.
         assert_eq!(week_start(d(2026, 11, 11), Monday), d(2026, 11, 9));
-        // Montag ist sein eigener Wochenstart, Sonntag gehört zur Woche davor.
+        // Monday is its own week start, Sunday belongs to the week before.
         assert_eq!(week_start(d(2026, 11, 9), Monday), d(2026, 11, 9));
         assert_eq!(week_start(d(2026, 11, 15), Monday), d(2026, 11, 9));
-        // Monats- und Jahreswechsel.
+        // Month and year boundaries.
         assert_eq!(week_start(d(2026, 12, 1), Monday), d(2026, 11, 30));
         assert_eq!(week_start(d(2027, 1, 1), Monday), d(2026, 12, 28));
         // Wochenstart Sonntag.

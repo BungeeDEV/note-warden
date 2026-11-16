@@ -1,4 +1,4 @@
-//! Zentrale semantische Zuordnung zur vorhandenen Lucide-Bibliothek.
+//! Central semantic mapping onto the existing Lucide library.
 use gpui_kit::assets::IconName;
 pub const SEARCH: IconName = IconName::Search;
 pub const SETTINGS: IconName = IconName::Settings;

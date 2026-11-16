@@ -23,7 +23,7 @@ use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{Disableable as _, Icon, Sizable as _};
 use gpui_kit::prelude::FluentBuilder as _;
 
-/// Ziehbarer Eintrag im Kalender.
+/// Draggable entry in the calendar.
 #[derive(Clone)]
 pub enum CalItem {
     Update(u64, String),
@@ -38,7 +38,7 @@ impl CalItem {
     }
 }
 
-/// Aufgabe, die in der Liste umsortiert wird.
+/// Task that is being reordered in the list.
 #[derive(Clone)]
 pub struct TaskDrag {
     pub update_id: u64,
@@ -46,7 +46,7 @@ pub struct TaskDrag {
     pub label: String,
 }
 
-/// Update-Karte, die im Board auf eine Statusspalte gezogen wird.
+/// Update card that is dragged onto a status column in the board.
 #[derive(Clone)]
 pub struct UpdateDrag {
     pub id: u64,
@@ -114,13 +114,13 @@ pub fn text_secondary(p: &Palette, text: impl Into<SharedString>) -> Div {
         .child(text.into())
 }
 
-/// Text mit Markierung der Suchtreffer (Groß-/Kleinschreibung egal).
+/// Text with the search matches highlighted (case-insensitive).
 pub fn highlighted(text: &str, query: &str, p: &Palette) -> StyledText {
     let mut ranges = Vec::new();
     let query = query.trim().to_lowercase();
     if !query.is_empty() {
         let lower = text.to_lowercase();
-        // Nur wenn Längen übereinstimmen, bleiben die Byteoffsets gültig.
+        // The byte offsets only stay valid if the lengths match.
         if lower.len() == text.len() {
             let mut from = 0;
             while let Some(i) = lower[from..].find(&query) {
@@ -148,7 +148,7 @@ impl NoteWarden {
         model::today()
     }
 
-    /// Datums-Chip: "+ Datum" bzw. relativer Text. Öffnet das Datums-Popover.
+    /// Date chip: "+ Datum" or relative text. Opens the date popover.
     pub fn date_chip(
         &self,
         id: String,
@@ -200,7 +200,7 @@ impl NoteWarden {
         })
     }
 
-    /// Kleines Glockensymbol (nur Icon + Tooltip), wenn eine offene Erinnerung gesetzt ist.
+    /// Small bell symbol (icon + tooltip only) when an open reminder is set.
     pub fn remind_bell(&self, target: DateTarget, cx: &mut Context<Self>) -> Option<AnyElement> {
         let target = reminders::Target::from_date_target(target)?;
         let remind = self.remind_of(target)?;
@@ -308,7 +308,7 @@ impl NoteWarden {
             .on_click(move |_, window, cx| entity.update(cx, |app, cx| on_click(app, window, cx)))
     }
 
-    /// Eintrag der Gruppen „Status“, „Filter“ und der unteren Ablage.
+    /// Entry of the "Status" and "Filter" groups and of the bottom shelf.
     #[allow(clippy::too_many_arguments)]
     fn view_item(
         &self,
@@ -339,7 +339,7 @@ impl NoteWarden {
             })
             .when(active, |d| d.bg(p.bg_active))
             .when(!active, |d| d)
-            // Gleicher Leading-Slot wie in `nav_item`: Punkt und Icon sitzen auf derselben Mittellinie.
+            // Same leading slot as in `nav_item`: dot and icon sit on the same center line.
             .child(
                 div()
                     .size(px(palette::ICON_LG))
@@ -355,7 +355,7 @@ impl NoteWarden {
                     }),
             )
             .child(div().flex_1().child(label))
-            // Null wird nicht angezeigt; echte Zahlen in text-secondary, Überfälliges hervorgehoben.
+            // Zero is not shown; real numbers in text-secondary, overdue items highlighted.
             .when(count > 0, |d| {
                 d.child(
                     div()
@@ -958,7 +958,7 @@ impl NoteWarden {
                         ),
                     )
                     .child(
-                        // Restzeit bis zum automatischen Ausblenden; steht still bei Hover.
+                        // Remaining time until automatic hiding; stands still on hover.
                         div()
                             .absolute()
                             .left_0()
@@ -972,7 +972,7 @@ impl NoteWarden {
             }))
     }
 
-    /// Splash beim Start: Schild, Name, Version, Fortschrittslinie. Bleibt bei Ladefehlern stehen.
+    /// Splash on start: shield, name, version, progress line. Stays up on load errors.
     fn splash_overlay(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let p = palette::get(cx);
         let reduce = self.workspace.settings.motion == model::Motion::Reduced;
@@ -986,7 +986,7 @@ impl NoteWarden {
         let logo: AnyElement = if reduce {
             crate::logo::shield(style).into_any_element()
         } else {
-            // 0–220 ms Einblenden, 220–380 ms Haken „poppt“ (1.0 → 1.12 → 1.0).
+            // 0–220 ms fade in, 220–380 ms the check mark "pops" (1.0 → 1.12 → 1.0).
             crate::logo::shield(style)
                 .into_any_element()
                 .with_animation(
@@ -1106,7 +1106,7 @@ impl NoteWarden {
             )
     }
 
-    /// Ruhiger Speicherstatus: kurz "Speichert …", dann 2 s "Gespeichert", danach nur ein Check-Icon.
+    /// Calm save status: briefly "Speichert …" (saving), then 2 s "Gespeichert" (saved), afterwards just a check icon.
     pub fn save_status(&self, p: &Palette, cx: &mut Context<Self>) -> AnyElement {
         let row = || {
             div()
@@ -1197,7 +1197,7 @@ impl NoteWarden {
 }
 
 impl Render for NoteWarden {
-    /// Error-Boundary: ein Fehler beim Aufbau der Oberfläche zeigt den Fehlerbildschirm statt abzustürzen.
+    /// Error boundary: an error while building the interface shows the error screen instead of crashing.
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         if !self.crashed {
             let drawn = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {

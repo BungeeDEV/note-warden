@@ -1,19 +1,19 @@
-//! Zentrale Design-Tokens. Komponenten lesen Farben ausschließlich hier
-//! (`palette::get(cx)`); Abstände/Radien/Schriftgrößen sind unten als Konstanten.
+//! Central design tokens. Components read colors exclusively here
+//! (`palette::get(cx)`); spacing/radii/font sizes are constants further down.
 
 use crate::model::{Accent, Density, FontScale, Settings, Status};
 use gpui_kit::component::theme::{Theme, ThemeMode};
 use gpui_kit::*;
 use std::sync::atomic::{AtomicU32, Ordering};
 
-// Spacing-Skala (4/8/12/16/24/32/48) und Control-Höhen (28/32/40).
+// Spacing scale (4/8/12/16/24/32/48) and control heights (28/32/40).
 pub const SP_1: f32 = 4.;
 pub const SP_2: f32 = 8.;
 pub const SP_3: f32 = 12.;
 pub const SP_4: f32 = 16.;
 pub const SP_6: f32 = 24.;
 pub const SP_8: f32 = 32.;
-/// Rechter Innenabstand scrollender Listen: Scrollbar-Daumen liegt als Overlay darüber und darf keinen Inhalt verdecken.
+/// Right padding of scrolling lists: the scrollbar thumb sits on top as an overlay and must not cover any content.
 pub const SCROLL_GUTTER: f32 = SP_3;
 pub const CTL_SM: f32 = 28.;
 pub const CTL_MD: f32 = 32.;
@@ -25,12 +25,12 @@ pub static SETTINGS_STACKED: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
 static COMPACT: AtomicU32 = AtomicU32::new(0);
 
-/// Schriftgröße mit globaler Skalierung (Einstellung „Schriftgröße“).
+/// Font size with global scaling (the "Schriftgröße" setting).
 pub fn fs(base: f32) -> Pixels {
     px((base * f32::from_bits(SCALE_BITS.load(Ordering::Relaxed))).round())
 }
 
-/// Zeilen-/Control-Höhen und Abstände; im kompakten Modus ca. 12 % kleiner.
+/// Row/control heights and spacing; about 12 % smaller in compact mode.
 pub fn dens(value: f32) -> Pixels {
     if COMPACT.load(Ordering::Relaxed) == 1 {
         px((value * 0.875).round())
@@ -61,7 +61,7 @@ pub fn contrast(a: Hsla, b: Hsla) -> f32 {
     (la.max(lb) + 0.05) / (la.min(lb) + 0.05)
 }
 
-/// Verschiebt die Helligkeit, bis `color` auf `bg` mindestens `min`:1 erreicht.
+/// Shifts the lightness until `color` reaches at least `min`:1 on `bg`.
 fn fit(mut color: Hsla, bg: Hsla, min: f32, lighten: bool) -> Hsla {
     for _ in 0..100 {
         if contrast(color, bg) >= min {
@@ -111,12 +111,12 @@ pub struct Palette {
     pub progress: Hsla,
     pub done: Hsla,
     pub danger: Hsla,
-    /// Prioritätsbalken: ungefüllt, Niedrig, Mittel, Hoch (je mindestens 3:1, siehe `build`).
+    /// Priority bars: unfilled, low, medium, high (each at least 3:1, see `build`).
     pub prio_off: Hsla,
     pub prio_low: Hsla,
     pub prio_mid: Hsla,
     pub prio_high: Hsla,
-    /// Hover-/Auswahlfläche und Rand in Menüs und Popovern.
+    /// Hover/selection surface and border in menus and popovers.
     pub bg_menu_hover: Hsla,
     pub border_popover: Hsla,
 }
@@ -143,7 +143,7 @@ impl Palette {
             Self::light_base()
         };
         let base: Hsla = c(choice.base());
-        // Akzent muss als Text/Linie auf allen Flächen AA erreichen.
+        // The accent must reach AA as text/line on all surfaces.
         let worst_bg = p.bg_hover;
         let accent = if dark {
             fit(base, worst_bg, 4.5, true)
@@ -167,7 +167,7 @@ impl Palette {
             dark_text
         };
         p.bg_active = if dark { c(0x292a30) } else { c(0xe8e8ed) };
-        // Prioritätsbalken: ungefüllt 3:1 gegen die Hover-Fläche, gefüllt 3:1 gegen ungefüllt.
+        // Priority bars: unfilled 3:1 against the hover surface, filled 3:1 against unfilled.
         let toward_text = dark;
         p.prio_off = fit(p.border_strong, p.bg_hover, 3., toward_text);
         p.prio_low = fit(p.text_secondary, p.prio_off, 3., toward_text);
@@ -178,10 +178,10 @@ impl Palette {
             3.,
             toward_text,
         );
-        // Menüs: Hover klar von der Popover-Fläche getrennt, Rand und Trennlinien 3:1.
+        // Menus: hover clearly separated from the popover surface, border and dividers 3:1.
         p.bg_menu_hover = fit(p.bg_hover, p.bg_elevated, 1.25, dark);
         p.border_popover = fit(p.border_strong, p.bg_elevated, 3., dark);
-        // Status bleibt unabhängig vom gewählten Interaktionsakzent.
+        // Status stays independent of the chosen interaction accent.
         p
     }
 
@@ -199,7 +199,7 @@ impl Palette {
             border_strong: c(0x34363c),
             text_primary: c(0xececee),
             text_secondary: c(0xa1a1aa),
-            // #71717a erreicht auf dem dunklen Grund nur ~3,9:1 (< AA); heller gewählt.
+            // #71717a only reaches ~3.9:1 (< AA) on the dark background; a lighter value was chosen.
             text_tertiary: c(0x8b8b96),
             accent,
             accent_hover: c(0x7dd3fc),
@@ -266,7 +266,7 @@ pub fn get(cx: &App) -> Palette {
     *cx.global::<Palette>()
 }
 
-/// Setzt Palette und Theme der Komponentenbibliothek.
+/// Sets the palette and the theme of the component library.
 pub fn apply(dark: bool, settings: &Settings, cx: &mut App) {
     set_metrics(settings.font_scale, settings.density);
     let p = Palette::build(dark, settings.accent);
@@ -282,7 +282,7 @@ pub fn apply(dark: bool, settings: &Settings, cx: &mut App) {
     );
     Theme::update(cx, |theme| {
         theme.scrollbar_mode = gpui_kit::component::scroll::ScrollbarMode::Always;
-        // Track unsichtbar, Daumen ruhig (3:1 gegen Popover-Fläche), Hover deutlicher.
+        // Track invisible, thumb calm (3:1 against the popover surface), hover more pronounced.
         theme.colors.scrollbar = gpui_kit::transparent_black();
         theme.tokens.scrollbar_thumb = p.border_popover.into();
         theme.tokens.scrollbar_thumb_hover = p.text_tertiary.into();
@@ -326,7 +326,7 @@ pub fn apply(dark: bool, settings: &Settings, cx: &mut App) {
     });
 }
 
-// UI-System: feste Größen unabhängig von der Inhaltsdichte.
+// UI system: fixed sizes independent of the content density.
 pub const ICON_XS: f32 = 12.;
 pub const ICON_SM: f32 = 14.;
 pub const ICON_MD: f32 = 16.;
@@ -346,18 +346,18 @@ pub const DETAIL_TITLE: f32 = 28.;
 pub const DETAIL_MAX_W: f32 = 720.;
 pub const MENU_RADIUS: f32 = 10.;
 pub const MIN_HIT: f32 = 32.;
-/// Gemeinsamer Leading-Slot aller Zeilen (Checkbox, Status-Icon); danach `SP_2` bis zum Titel.
+/// Shared leading slot of all rows (checkbox, status icon); followed by `SP_2` up to the title.
 pub const ROW_LEADING_SLOT: f32 = 24.;
 pub const CONTROL_PAD_SM: f32 = 10.;
 pub const CONTROL_PAD_MD: f32 = 12.;
 pub const CONTROL_PAD_LG: f32 = 16.;
 
-// Radien (Ergänzung) und Layout-Schwellen.
+// Radii (additions) and layout thresholds.
 pub const R_XS: f32 = 4.;
 pub const SIDEBAR_COLLAPSE_W: f32 = 1100.;
 
 // Elevation: Panel = Rand subtil · Karte = Rand strong · Popover/Toast = `shadow_lg` · Dialog = `shadow_lg` + Scrim.
-// Bewegung: kurz 120 ms, normal 200 ms, lang 300 ms; Auslaufkurve kritisch gedämpft (kein Überschwingen).
+// Motion: short 120 ms, normal 200 ms, long 300 ms; ease-out curve critically damped (no overshoot).
 pub const MOTION_FAST_MS: u64 = 120;
 #[allow(dead_code)]
 pub const MOTION_NORMAL_MS: u64 = 200;
@@ -369,22 +369,22 @@ pub fn motion(ms: u64) -> std::time::Duration {
     std::time::Duration::from_millis(ms)
 }
 
-/// Kritisch gedämpfte Auslaufkurve (ease-out, quint).
+/// Critically damped ease-out curve (ease-out, quint).
 pub fn ease_out(t: f32) -> f32 {
     1. - (1. - t).powi(5)
 }
 
-/// Feste Palette für Projektfarben (klar unterscheidbare Töne).
+/// Fixed palette for project colors (clearly distinguishable tones).
 pub const PROJECT_PALETTE: [u32; 8] = [
     0x38bdf8, 0xa78bfa, 0xf472b6, 0xfb923c, 0x4ade80, 0x2dd4bf, 0xfacc15, 0xf87171,
 ];
 
-/// Startfarbe für ein neues Projekt: deterministisch aus der Projekt-ID.
+/// Starting color for a new project: deterministic from the project ID.
 pub fn default_project_color(id: u64) -> u32 {
     PROJECT_PALETTE[(id % PROJECT_PALETTE.len() as u64) as usize]
 }
 
-/// Einzige Quelle der Projektfarbe: gespeicherter Wert, sonst Palette per ID; mindestens 3:1 gegen Hover-Fläche.
+/// The only source of the project color: the stored value, otherwise the palette by ID; at least 3:1 against the hover surface.
 pub fn project_color(project: &crate::model::Project, p: &Palette) -> Hsla {
     let base = if project.color == 0 {
         default_project_color(project.id)

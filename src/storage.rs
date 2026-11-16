@@ -10,9 +10,9 @@ use std::{
 pub struct Loaded {
     pub workspace: Workspace,
     pub recovered: bool,
-    /// Die Datei hatte ein älteres Schema und wurde migriert.
+    /// The file had an older schema and was migrated.
     pub migrated: bool,
-    /// Zeitpunkt (Unix-ms) der Sicherung, aus der automatisch wiederhergestellt wurde.
+    /// Time (Unix ms) of the backup that was automatically restored from.
     pub restored_from: Option<i64>,
 }
 
@@ -51,7 +51,7 @@ pub fn data_path() -> PathBuf {
         .unwrap_or_else(|| PathBuf::from("workspace.json"))
 }
 
-/// Liest Bytes, repariert IDs und hebt das Schema an. Zweiter Wert: vorherige Schemaversion, falls migriert.
+/// Reads bytes, repairs IDs and raises the schema. Second value: the previous schema version, if migrated.
 fn decode(bytes: &[u8]) -> io::Result<(Workspace, Option<u32>)> {
     let mut workspace: Workspace = serde_json::from_slice(bytes)
         .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
@@ -62,8 +62,8 @@ fn decode(bytes: &[u8]) -> io::Result<(Workspace, Option<u32>)> {
     Ok((workspace, migrated.then_some(from)))
 }
 
-/// Sichert die unveränderte Datei vor der ersten Migration (einmalig je Ausgangsversion):
-/// Schema 3 -> `.bak-0.3.0`, ältere Dateien -> `.bak-0.2.0`.
+/// Backs up the unchanged file before the first migration (once per source version):
+/// schema 3 -> `.bak-0.3.0`, older files -> `.bak-0.2.0`.
 fn backup_before_migration(path: &Path, bytes: &[u8], from: u32) -> io::Result<()> {
     let label = if from >= 7 {
         "0.9.2"
@@ -90,7 +90,7 @@ fn backup_before_migration(path: &Path, bytes: &[u8], from: u32) -> io::Result<(
     Ok(())
 }
 
-/// Schreibt eine beliebige Datei atomar (temp-Datei, dann umbenennen).
+/// Writes any file atomically (temp file, then rename).
 pub fn write_atomic(path: &Path, bytes: &[u8]) -> io::Result<()> {
     let mut name = path.file_name().unwrap_or_default().to_os_string();
     name.push(".tmp");
@@ -102,7 +102,7 @@ pub fn write_atomic(path: &Path, bytes: &[u8]) -> io::Result<()> {
     fs::rename(&temporary, path)
 }
 
-/// Liest ein JSON-Backup (für Vorschau/Import).
+/// Reads a JSON backup (for preview/import).
 pub fn read_backup_file(path: &Path) -> io::Result<Workspace> {
     Ok(decode(&fs::read(path)?)?.0)
 }
@@ -157,8 +157,8 @@ pub fn load(path: &Path) -> io::Result<Loaded> {
     }
 }
 
-/// Defekte Datendatei: neueste gültige Sicherung laden, die defekte Datei als
-/// `*.corrupt-<Zeitstempel>` ablegen (nie löschen). Ohne gültige Sicherung bleibt der Fehler.
+/// Damaged data file: load the newest valid backup and move the damaged file aside as
+/// `*.corrupt-<timestamp>` (never delete it). Without a valid backup the error remains.
 fn recover_automatically(path: &Path, original: io::Error) -> io::Result<Loaded> {
     crate::log::error("Datendatei nicht lesbar, suche Sicherung");
     let mut candidates: Vec<(PathBuf, i64)> = Vec::new();
@@ -197,14 +197,14 @@ fn millis(time: SystemTime) -> i64 {
         .unwrap_or(0)
 }
 
-// ---------- Backups (Ordner `backups/` neben der Datendatei) ----------
+// ---------- Backups (folder `backups/` next to the data file) ----------
 
 #[derive(Clone)]
 pub struct BackupInfo {
     pub path: PathBuf,
-    /// Unix-Millisekunden, aus dem Dateinamen.
+    /// Unix milliseconds, from the file name.
     pub at: i64,
-    /// Manuell angelegt: wird nie automatisch gelöscht.
+    /// Created manually: never deleted automatically.
     pub pinned: bool,
     pub size: u64,
 }
@@ -265,7 +265,7 @@ fn write_backup_bytes(path: &Path, bytes: &[u8], schema: u32, pinned: bool) -> i
     Ok(target)
 }
 
-/// Legt ein Backup im Format der Datendatei an. Automatische Backups räumen danach auf.
+/// Creates a backup in the format of the data file. Automatic backups clean up afterwards.
 pub fn create_backup(path: &Path, workspace: &Workspace, pinned: bool) -> io::Result<PathBuf> {
     let bytes = serde_json::to_vec_pretty(workspace).map_err(io::Error::other)?;
     let target = write_backup_bytes(path, &bytes, workspace.schema_version, pinned)?;
@@ -281,8 +281,8 @@ pub fn create_backup(path: &Path, workspace: &Workspace, pinned: bool) -> io::Re
 }
 
 /// Welche Backups bleiben? `entries` = (Zeitpunkt in Unix-ms, gepinnt); Ergebnis gleich lang.
-/// Behalten: gepinnte, die 3 neuesten insgesamt, die 10 neuesten automatischen, je das neueste
-/// pro Tag der letzten 7 Tage und je das neueste pro Woche der letzten 4 Wochen.
+/// Kept: pinned ones, the 3 newest overall, the 10 newest automatic ones, the newest one
+/// per day of the last 7 days and the newest one per week of the last 4 weeks.
 pub fn retention(entries: &[(i64, bool)], now: i64) -> Vec<bool> {
     use chrono::{Datelike, Local, TimeZone};
     const DAY: i64 = 86_400_000;
@@ -330,7 +330,7 @@ pub fn prune_backups(path: &Path) {
     }
 }
 
-// ---------- Versionsverlauf der Notiztexte (`history/<update-id>.json`) ----------
+// ---------- Version history of the note texts (`history/<update-id>.json`) ----------
 
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct Snapshot {
@@ -346,7 +346,7 @@ fn history_file(path: &Path, update_id: u64) -> PathBuf {
         .join(format!("{update_id}.json"))
 }
 
-/// Fehlende oder defekte Dateien ergeben einen leeren Verlauf.
+/// Missing or damaged files result in an empty history.
 pub fn read_history(path: &Path, update_id: u64) -> Vec<Snapshot> {
     fs::read(history_file(path, update_id))
         .ok()
@@ -357,15 +357,15 @@ pub fn read_history(path: &Path, update_id: u64) -> Vec<Snapshot> {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Snapshotted {
     Saved,
-    /// Text gleicht dem letzten Snapshot (oder ist leer): nichts zu tun.
+    /// The text equals the last snapshot (or is empty): nothing to do.
     Unchanged,
-    /// Letzter Snapshot ist jünger als 5 Minuten: später erneut versuchen.
+    /// The last snapshot is younger than 5 minutes: try again later.
     TooSoon,
     Failed,
 }
 
-/// Speichert einen Snapshot, wenn sich der Text zum letzten unterscheidet. `force` ignoriert
-/// den Mindestabstand von 5 Minuten (Verlassen des Updates, Beenden, Wiederherstellen).
+/// Stores a snapshot if the text differs from the last one. `force` ignores
+/// the minimum interval of 5 minutes (leaving the update, quitting, restoring).
 pub fn add_snapshot(path: &Path, update_id: u64, text: &str, now: i64, force: bool) -> Snapshotted {
     let mut list = read_history(path, update_id);
     if list.last().is_some_and(|last| last.text == text)
@@ -401,7 +401,7 @@ pub fn add_snapshot(path: &Path, update_id: u64, text: &str, now: i64, force: bo
     }
 }
 
-/// Entfernt Verläufe von Updates, die es nicht mehr gibt (endgültig gelöscht).
+/// Removes histories of updates that no longer exist (deleted permanently).
 pub fn prune_history(path: &Path, existing: &std::collections::BTreeSet<u64>) {
     let Ok(entries) = fs::read_dir(path.with_file_name("history")) else {
         return;
@@ -417,8 +417,8 @@ pub fn prune_history(path: &Path, existing: &std::collections::BTreeSet<u64>) {
     }
 }
 
-/// Minimale Kopie von Theme/Akzent/Fenster, die vor dem Laden des Arbeitsbereichs
-/// gelesen wird (kein Aufblitzen im falschen Theme, Fenstergröße vor dem Öffnen bekannt).
+/// Minimal copy of theme/accent/window that is read before the workspace is loaded
+/// (no flash in the wrong theme, the window size is known before opening).
 #[derive(serde::Serialize, serde::Deserialize, Default)]
 pub struct Prefs {
     #[serde(default)]

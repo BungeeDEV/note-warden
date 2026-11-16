@@ -1,4 +1,4 @@
-//! Reiner Quick-Add-Parser; Positionen sind UTF-8-Bytebereiche im Originaltext.
+//! Pure quick-add parser; positions are UTF-8 byte ranges in the original text.
 use crate::{dates, model::Project};
 use chrono::NaiveDate;
 use std::ops::Range;
@@ -133,7 +133,7 @@ pub fn parse_quick_input(text: &str, now: NaiveDate, projects: &[Project]) -> Pa
     result
 }
 
-/// Typ-Tokens ergänzen die bestehende Quick-Add-Syntax für Aufgaben.
+/// Type tokens extend the existing quick-add syntax for tasks.
 pub fn task_kind(text: &str) -> (crate::model::ChangeKind, String) {
     use crate::model::ChangeKind;
     let mut kind = ChangeKind::Added;

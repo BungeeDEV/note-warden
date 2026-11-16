@@ -96,7 +96,7 @@ impl NoteWarden {
         out
     }
 
-    /// Eintrag als Pill (22 px, Statusbalken links) bzw. in der Wochenansicht als Karte.
+    /// Entry as a pill (22 px, status bar on the left) or, in the week view, as a card.
     fn pill(
         &self,
         entry: &Entry,
@@ -347,7 +347,7 @@ impl NoteWarden {
                 move |ev, window, cx| {
                     entity.update(cx, |app, cx| {
                         app.cal_focus = Some(date);
-                        // Doppelklick auf eine leere Fläche öffnet die Eingabe.
+                        // Double-clicking an empty area opens the input.
                         if ev.click_count() >= 2 {
                             Self::open_inline(date, window, cx, app);
                         } else {
@@ -415,7 +415,7 @@ impl NoteWarden {
             .when(inline, |d| d.child(self.inline_editor(&p)))
     }
 
-    /// Spalte der Wochenansicht: Tagesüberschrift und scrollbare Kartenliste.
+    /// Week view column: day heading and a scrollable card list.
     fn week_column(
         &self,
         date: NaiveDate,
@@ -757,7 +757,7 @@ impl NoteWarden {
             )
     }
 
-    /// Kontextmenü (Rechtsklick): Öffnen, Datum entfernen, Status ändern.
+    /// Context menu (right click): open, remove date, change status.
     pub(super) fn pill_menu_overlay(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let p = palette::get(cx);
         let menu = self.pill_menu.expect("menu");
@@ -920,7 +920,7 @@ impl NoteWarden {
                     .h_full()
                     .flex()
                     .flex_col()
-                    // Sticky Kopfzeile: liegt außerhalb des scrollenden Rasters.
+                    // Sticky header row: sits outside the scrolling grid.
                     .child(
                         div()
                             .min_h(px(64.))
@@ -1026,7 +1026,7 @@ impl NoteWarden {
                                     ),
                             ),
                     )
-                    // Wochenkopf linksbündig mit denselben Einzügen wie die Tageszahlen.
+                    // Week header left-aligned with the same insets as the day numbers.
                     .when(month_mode, |d| {
                         d.child(
                             div()

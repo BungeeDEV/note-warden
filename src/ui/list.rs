@@ -3,7 +3,7 @@ use gpui_kit::component::menu::{ContextMenuExt as _, DropdownMenu as _, PopupMen
 
 type MenuFn = dyn Fn(PopupMenu, &mut Window, &mut Context<PopupMenu>) -> PopupMenu;
 
-/// Menü für ein Update (Kontextmenü, "…" in der Liste und im Detail).
+/// Menu for an update (context menu, "…" in the list and in the detail).
 pub fn update_menu(
     entity: Entity<NoteWarden>,
     id: u64,
@@ -109,7 +109,7 @@ impl NoteWarden {
                 .any(|t| t.to_lowercase().contains(query.trim_start_matches('#')))
     }
 
-    /// Gehört das Update zur Sidebar-Ansicht (ohne Suche und Filter aus dem Popover)?
+    /// Does the update belong to the sidebar view (without search and filters from the popover)?
     fn in_scope(&self, u: &model::Update) -> bool {
         let today = self.now_today();
         let week_end = self.week_end(today);
@@ -262,7 +262,7 @@ impl NoteWarden {
         rows
     }
 
-    /// Meta-Teile einer Update-Zeile oder -Karte in fester Reihenfolge: Projekt · Fortschritt · Datum.
+    /// Meta parts of an update row or card in a fixed order: project · progress · date.
     pub(super) fn meta_parts(&self, update: &model::Update, p: &Palette) -> Vec<AnyElement> {
         let (done, total) = update.task_progress();
         let today = self.now_today();
@@ -339,7 +339,7 @@ impl NoteWarden {
         let project = update
             .project_id
             .and_then(|pid| self.workspace.projects.iter().find(|p| p.id == pid));
-        // Meta-Zeile als Fließtext: Projekt · Fortschritt · Datum (ohne Chips).
+        // Meta line as running text: project · progress · date (without chips).
         let mut meta = self.meta_parts(update, &p);
         if !self.search_query.is_empty() && !update.notes.trim().is_empty() {
             meta.push(
@@ -896,7 +896,7 @@ impl NoteWarden {
             .when(!self.multi.is_empty(), |d| d.child(self.bulk_bar(cx)))
     }
 
-    /// Klick auf eine Karte: Strg schaltet um, Umschalt wählt einen Bereich, sonst normal öffnen.
+    /// Click on a card: Ctrl toggles, Shift selects a range, otherwise open normally.
     pub fn click_card(
         &mut self,
         id: u64,
@@ -1029,7 +1029,7 @@ impl NoteWarden {
         );
     }
 
-    /// Aktionsleiste am unteren Rand bei Mehrfachauswahl.
+    /// Action bar at the bottom edge for multi-selection.
     fn bulk_bar(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let p = palette::get(cx);
         let n = self.multi.len();

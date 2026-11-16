@@ -1,4 +1,4 @@
-//! Einstellungen: große Ansicht mit Kategorien, Karten und Zeilen. Änderungen gelten sofort.
+//! Settings: a large view with categories, cards and rows. Changes apply immediately.
 
 use super::kit::*;
 use super::*;
@@ -8,7 +8,7 @@ use crate::model::{
 };
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 
-/// Baut einen Abschnitt (Überschrift + Karte aus Zeilen); Zeilen filtern sich über die Suche.
+/// Builds a section (heading + card of rows); rows filter themselves through the search.
 struct Section {
     p: Palette,
     q: String,
@@ -120,7 +120,7 @@ impl Section {
         self
     }
 
-    /// „Auf Standard zurücksetzen“ erscheint nur, wenn etwas vom Standard abweicht.
+    /// "Auf Standard zurücksetzen" (reset to default) only appears if something differs from the default.
     fn reset(mut self, differs: bool, f: ClickFn) -> Self {
         if differs {
             self.reset = Some(f);
@@ -139,7 +139,7 @@ impl Section {
         );
     }
 
-    /// Zeile mit dynamischer Beschreibung (Pfad, Zahlen).
+    /// Row with a dynamic description (path, numbers).
     fn row_text(&mut self, title: &'static str, desc: String, control: impl IntoElement) {
         if !matches_query(&self.q, title, &desc) {
             return;
@@ -201,7 +201,7 @@ impl Section {
     }
 }
 
-/// Kürzt lange Pfade in der Mitte ("C:\\Users\\…\\Note Warden").
+/// Shortens long paths in the middle ("C:\\Users\\…\\Note Warden").
 fn ellipsize_middle(text: &str, max: usize) -> String {
     let chars: Vec<char> = text.chars().collect();
     if chars.len() <= max {
@@ -296,7 +296,7 @@ pub const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
 ];
 
 impl NoteWarden {
-    // ---------- Aktionen der Daten-Kategorie ----------
+    // ---------- Actions of the data category ----------
 
     pub fn reveal_data_file(&mut self, cx: &mut Context<Self>) {
         if !crate::system::reveal(&self.path) {
@@ -312,7 +312,7 @@ impl NoteWarden {
         }
     }
 
-    /// Stellt ein Backup wieder her; der aktuelle Stand wird vorher gesichert, Einstellungen bleiben.
+    /// Restores a backup; the current state is backed up first, settings are kept.
     pub fn restore_from_backup(&mut self, at: i64, window: &mut Window, cx: &mut Context<Self>) {
         self.dialog = None;
         let Some(path) = self
@@ -367,7 +367,7 @@ impl NoteWarden {
         }
     }
 
-    /// Registriert einen neuen Hotkey; bei Konflikt bleibt der alte aktiv und die Zeile erklärt es.
+    /// Registers a new hotkey; on a conflict the old one stays active and the row explains it.
     pub fn apply_hotkey(&mut self, text: &str, cx: &mut Context<Self>) {
         self.hotkey_capture = false;
         match crate::system::set_hotkey(text) {
@@ -395,7 +395,7 @@ impl NoteWarden {
         });
     }
 
-    /// Nimmt die nächste Tastenkombination als Hotkey (Esc bricht ab).
+    /// Takes the next key combination as the hotkey (Esc cancels).
     pub fn capture_hotkey(
         &mut self,
         event: &KeyDownEvent,
@@ -477,7 +477,7 @@ impl NoteWarden {
         if !self.writable {
             return;
         }
-        // Gepinntes Backup, bevor irgendetwas gelöscht wird.
+        // Pinned backup before anything is deleted.
         if !self.backup_now(true) {
             self.toast(
                 "Sicherheitskopie fehlgeschlagen – nichts gelöscht",
@@ -726,7 +726,7 @@ impl NoteWarden {
         let today = self.now_today();
         let entity = cx.entity();
 
-        // Kleine Bauhelfer: jeder Schalter/jedes Segment schreibt über `update_settings`.
+        // Small builder helpers: every switch/segment writes through `update_settings`.
         let sw = |id: &'static str, on: bool, label: &'static str, apply: fn(&mut Settings)| {
             let e = entity.clone();
             switch(
@@ -1049,7 +1049,7 @@ impl NoteWarden {
                         .gap(px(palette::SP_1))
                         .children(Accent::ALL.map(|choice| {
                             let e = entity.clone();
-                            // Vorschaufarbe: so, wie der Akzent im aktiven Theme aufgelöst wird.
+                            // Preview color: as the accent is resolved in the active theme.
                             let color = Palette::build(p.dark, choice).accent;
                             swatch(
                                 SharedString::from(format!("accent-{}", choice.label())),

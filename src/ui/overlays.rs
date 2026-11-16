@@ -5,8 +5,8 @@ use gpui_kit::component::input::{
     Enter, Escape, MoveDown, MoveLeft, MovePageDown, MovePageUp, MoveRight, MoveUp,
 };
 
-/// Fuzzy-Treffer: alle Zeichen der Eingabe in Reihenfolge, Bonus für zusammenhängende
-/// Treffer und Wortanfänge. `None` = kein Treffer.
+/// Fuzzy match: all characters of the input in order, a bonus for contiguous
+/// matches and word starts. `None` = no match.
 pub fn fuzzy_score(query: &str, text: &str) -> Option<i32> {
     let query: Vec<char> = query
         .to_lowercase()
@@ -509,7 +509,7 @@ impl NoteWarden {
             ))
     }
 
-    /// Zeile "Erinnerung" im Datums-Popover (nur für Updates, Aufgaben und Inbox-Einträge).
+    /// "Erinnerung" (reminder) row in the date popover (only for updates, tasks and inbox entries).
     fn reminder_row(
         &self,
         date_target: DateTarget,
@@ -703,7 +703,7 @@ impl NoteWarden {
         )
     }
 
-    /// Dezente Leiste: Update verfügbar, Fortschritt oder bereit zum Neustart.
+    /// Subtle bar: update available, progress or ready to restart.
     pub(super) fn update_banner(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let p = palette::get(cx);
         let state = self
@@ -820,7 +820,7 @@ impl NoteWarden {
         }
     }
 
-    /// Ruhiger Hinweis nach automatischer Wiederherstellung (schließbar).
+    /// Calm notice after an automatic restore (dismissible).
     pub(super) fn restore_banner(&self, at: i64, cx: &mut Context<Self>) -> impl IntoElement {
         let p = palette::get(cx);
         let when = dates::full_time(at).unwrap_or_default();

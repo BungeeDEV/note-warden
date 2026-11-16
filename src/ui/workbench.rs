@@ -1,4 +1,4 @@
-//! Gemeinsamer Änderungsverlauf und Interaktion des Updates-Arbeitsbereichs.
+//! Shared change history and interaction of the updates workspace.
 use super::*;
 use gpui_kit::component::menu::{ContextMenuExt as _, DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::popover::{Popover, PopoverState};
@@ -124,7 +124,7 @@ impl NoteWarden {
         let Some(mut target) = target else {
             return;
         };
-        // Notiztext behält seinen eigenen Editor-Verlauf.
+        // The note text keeps its own editor history.
         for u in &mut target {
             if let Some(current) = self.workspace.update(u.id) {
                 u.notes = current.notes.clone();
@@ -326,7 +326,7 @@ impl NoteWarden {
     }
 }
 
-/// Zähler für die Filterlisten im Popover (nur aktive, nicht gelöschte Updates).
+/// Counters for the filter lists in the popover (only active, non-deleted updates).
 struct ViewCounts {
     status: [usize; 4],
     priority: [usize; 4],
@@ -352,7 +352,7 @@ const DATE_LABELS: [&str; 5] = [
 
 type StateFn = Box<dyn Fn(&mut NoteWarden, &mut Context<NoteWarden>)>;
 
-/// Klick-Handler im Filter-Popover: ändert den Zustand und rendert das Popover neu.
+/// Click handler in the filter popover: changes the state and re-renders the popover.
 fn pop_click(
     app: &Entity<NoteWarden>,
     pop: &Entity<PopoverState>,
@@ -365,7 +365,7 @@ fn pop_click(
     }
 }
 
-/// Zeile mit Radio- oder Checkbox-Anzeige im Popover.
+/// Row with a radio or checkbox display in the popover.
 fn option_row(
     id: SharedString,
     p: &Palette,
@@ -517,7 +517,7 @@ impl NoteWarden {
         self.reset_filters(cx);
     }
 
-    /// Ein IconButton "Filter & Ansicht" mit Popover (Sortierung, Gruppierung, Anzeige, Filter).
+    /// One icon button "Filter & Ansicht" (filter & view) with a popover (sorting, grouping, display, filter).
     pub fn view_popover(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let p = palette::get(cx);
         let app = cx.entity();
@@ -901,7 +901,7 @@ impl NoteWarden {
         self.toast(format!("Ansicht {number} gespeichert"), None, cx);
     }
 
-    /// Einzeilige Reihe aktiver Filter unter der Suche; ohne aktive Filter gibt es sie nicht.
+    /// Single-line row of active filters under the search; without active filters it does not exist.
     pub fn filter_chips(&self, cx: &mut Context<Self>) -> Option<Div> {
         let p = palette::get(cx);
         let ui = &self.workspace.settings.updates_ui;
@@ -1063,7 +1063,7 @@ impl NoteWarden {
             && ui.tags == state.tags
     }
 
-    /// Gespeicherte Ansichten für die Sidebar-Gruppe "Ansichten".
+    /// Saved views for the "Ansichten" (views) sidebar group.
     pub fn saved_view_items(&self, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let p = palette::get(cx);
         self.workspace

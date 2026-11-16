@@ -1,5 +1,5 @@
-//! Schlanke rotierende Logdatei (3 Dateien à ca. 1 MB) im Datenordner.
-//! Enthält nur Ereignisse und Fehler, nie Titel oder Notiztexte.
+//! Lean rotating log file (3 files of about 1 MB each) in the data folder.
+//! Contains only events and errors, never titles or note texts.
 use std::{
     fs::{self, OpenOptions},
     io::Write,
@@ -56,7 +56,7 @@ pub fn error(message: &str) {
     write("ERROR", message);
 }
 
-/// Panics landen im Log (ohne Nutzerinhalte: nur Ort, kein Nachrichtentext).
+/// Panics end up in the log (without user content: only the location, no message text).
 pub fn install_panic_hook() {
     let previous = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {

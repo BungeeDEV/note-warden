@@ -4,9 +4,9 @@ fn main() {
     println!("cargo:rerun-if-changed=branding/app.ico");
     println!("cargo:rerun-if-changed=src");
     println!("cargo:rerun-if-changed=CHANGELOG.md");
-    // Windows erlaubt das Umbenennen einer laufenden EXE, aber nicht ihr
-    // Überschreiben. Nur das eigene Cargo-Artefakt aus dem Weg räumen;
-    // laufende Instanzen und ihre Daten bleiben unberührt.
+    // Windows allows renaming a running EXE, but not overwriting it.
+    // Only move our own Cargo artifact out of the way;
+    // running instances and their data stay untouched.
     if cfg!(windows) {
         let out = std::path::PathBuf::from(std::env::var_os("OUT_DIR").expect("OUT_DIR"));
         if let Some(profile) = out.ancestors().nth(3) {
@@ -23,7 +23,8 @@ fn main() {
                         .expect("Systemzeit")
                         .as_nanos();
                     let previous = out.join(format!("note-warden-running-{stamp}-{index}.exe"));
-                    std::fs::rename(&exe, &previous).expect("Eigene Build-EXE konnte nicht umbenannt werden; Dateiberechtigungen prüfen");
+                    std::fs::rename(&exe, &previous)
+                        .expect("Could not rename our own build EXE; check the file permissions");
                     let _ = std::fs::remove_file(previous);
                 }
             }
@@ -40,19 +41,19 @@ fn main() {
             }
         }
     }
-    // Die verschachtelte GPUI-Elementstruktur braucht im Debug-Build mehr als die
-    // 1 MiB Standard-Stack der Windows-Hauptthread. 16 MiB reichen mit Reserve.
+    // The nested GPUI element structure needs more in the debug build than the
+    // 1 MiB default stack of the Windows main thread. 16 MiB is enough with headroom.
     if std::env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc") {
         println!("cargo:rustc-link-arg-bins=/STACK:16777216");
     }
-    // App-Icon (Explorer, Taskleiste, Titelleiste) als Ressource in die Exe einbetten.
+    // Embed the app icon (Explorer, taskbar, title bar) into the exe as a resource.
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
         let mut res = winresource::WindowsResource::new();
         res.set_icon("branding/app.ico");
         res.set("ProductName", "Note Warden");
         res.set("FileDescription", "Note Warden");
         if let Err(error) = res.compile() {
-            println!("cargo:warning=Icon konnte nicht eingebettet werden: {error}");
+            println!("cargo:warning=Could not embed the icon: {error}");
         }
     }
 }

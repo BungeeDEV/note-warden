@@ -1,5 +1,5 @@
 //! Windows-Integration: Ereigniskanal, Einzelinstanz, Hauptfenster, Tray, globaler Hotkey,
-//! Autostart und Benachrichtigungen. Alles lokal, keine Netzwerkzugriffe.
+//! autostart and notifications. Everything is local, no network access.
 use crate::reminders::Target;
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender, unbounded};
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
@@ -116,7 +116,7 @@ const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 const APP_ID: &str = "NoteWarden.App";
 const WINDOW_TITLE: &str = "Note Warden";
 
-/// Ereignisse aus Tray, Hotkey, Benachrichtigungen und zweitem Programmstart.
+/// Events from the tray, hotkey, notifications and a second program start.
 pub enum Event {
     ShowWindow,
     QuickCapture,
@@ -148,7 +148,7 @@ fn wide(text: &str) -> Vec<u16> {
     text.encode_utf16().chain(std::iter::once(0)).collect()
 }
 
-/// Öffnet Datei oder Ordner mit der Standard-App.
+/// Opens a file or folder with the default app.
 pub fn open_path(path: &Path) -> bool {
     Command::new("explorer")
         .arg(path)
@@ -157,7 +157,7 @@ pub fn open_path(path: &Path) -> bool {
         .is_ok()
 }
 
-/// Zeigt eine Datei markiert im Explorer.
+/// Shows a file selected in Explorer.
 pub fn reveal(path: &Path) -> bool {
     Command::new("explorer")
         .arg(format!("/select,{}", path.display()))
@@ -165,9 +165,9 @@ pub fn reveal(path: &Path) -> bool {
         .is_ok()
 }
 
-// ---------- Einzelinstanz und Hauptfenster ----------
+// ---------- Single instance and main window ----------
 
-/// `false`, wenn Note Warden schon läuft; dann wurde dessen Fenster nach vorn geholt.
+/// `false` if Note Warden is already running; its window was then brought to the front.
 pub fn claim_single_instance() -> bool {
     let suffix = std::env::var_os("NOTE_WARDEN_DATA_DIR")
         .map(|path| {
@@ -178,7 +178,7 @@ pub fn claim_single_instance() -> bool {
         })
         .unwrap_or_default();
     let name = wide(&format!("Local\\NoteWarden.SingleInstance{suffix}"));
-    // Das Handle bleibt bis zum Prozessende offen.
+    // The handle stays open until the process ends.
     let handle = unsafe { CreateMutexW(std::ptr::null(), 0, name.as_ptr()) };
     let exists = !handle.is_null() && unsafe { GetLastError() } == ERROR_ALREADY_EXISTS;
     if exists {
@@ -222,7 +222,7 @@ thread_local! {
     static HOTKEYS: RefCell<Option<(global_hotkey::GlobalHotKeyManager, Option<global_hotkey::hotkey::HotKey>)>> = const { RefCell::new(None) };
 }
 
-/// Legt das Tray-Symbol an (Hauptthread). Menü: Öffnen, Neues Update, Heute, Beenden.
+/// Creates the tray icon (main thread). Menu: open, new update, today, quit.
 pub fn create_tray() {
     use tray_icon::{
         Icon, MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent,
@@ -285,7 +285,7 @@ pub enum HotkeyError {
     Taken,
 }
 
-/// "Strg+Alt+N" -> Hotkey. Erlaubt Strg/Alt/Umschalt/Win plus Buchstabe, Ziffer oder F-Taste.
+/// "Strg+Alt+N" -> hotkey. Allows Ctrl/Alt/Shift/Win plus a letter, digit or F key.
 fn parse_hotkey(text: &str) -> Option<global_hotkey::hotkey::HotKey> {
     let english: Vec<String> = text
         .split('+')
@@ -300,7 +300,7 @@ fn parse_hotkey(text: &str) -> Option<global_hotkey::hotkey::HotKey> {
     english.join("+").parse().ok()
 }
 
-/// Registriert den Hotkey neu; bei Fehler bleibt der bisherige aktiv.
+/// Registers the hotkey anew; on failure the previous one stays active.
 pub fn set_hotkey(text: &str) -> Result<(), HotkeyError> {
     use global_hotkey::{GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
     let hotkey = parse_hotkey(text).ok_or(HotkeyError::Invalid)?;
@@ -338,7 +338,7 @@ pub fn autostart_enabled() -> bool {
         .is_ok()
 }
 
-/// Beim Windows-Start minimiert im Tray starten.
+/// Start minimized in the tray when Windows starts.
 pub fn set_autostart(on: bool) -> std::io::Result<()> {
     let (key, _) =
         winreg::RegKey::predef(winreg::enums::HKEY_CURRENT_USER).create_subkey(RUN_KEY)?;
@@ -355,7 +355,7 @@ pub fn set_autostart(on: bool) -> std::io::Result<()> {
 
 // ---------- Benachrichtigungen ----------
 
-/// Meldet die App bei Windows an (Name und Symbol in Benachrichtigungen statt "PowerShell").
+/// Registers the app with Windows (name and icon in notifications instead of "PowerShell").
 pub fn register_app_id(data_dir: &Path) {
     unsafe { SetCurrentProcessExplicitAppUserModelID(wide(APP_ID).as_ptr()) };
     let icon = data_dir.join("app.ico");
@@ -374,7 +374,7 @@ pub fn register_app_id(data_dir: &Path) {
     }
 }
 
-/// Windows-Benachrichtigung; Klick und Schaltflächen kommen als `Event::Reminder` zurück.
+/// Windows notification; clicks and buttons come back as `Event::Reminder`.
 pub fn notify(title: &str, body: &str, target: Option<Target>) -> bool {
     use tauri_winrt_notification::{Duration, Toast};
     let mut toast = Toast::new(APP_ID)

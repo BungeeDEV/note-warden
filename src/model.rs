@@ -1,8 +1,8 @@
 use chrono::{Datelike, Duration, Local, NaiveDate, NaiveDateTime, Weekday};
 use serde::{Deserialize, Serialize};
 
-/// Aktuelle Schemaversion der Arbeitsbereich-Datei. Dateien ohne Version
-/// (0.1 / 0.2) werden beim Laden migriert, vorher wird ein Backup angelegt.
+/// Current schema version of the workspace file. Files without a version
+/// (0.1 / 0.2) are migrated on load; a backup is created beforehand.
 pub const SCHEMA_VERSION: u32 = 8;
 pub const TRASH_DAYS: i64 = 30;
 
@@ -59,7 +59,7 @@ impl ChangeKind {
     }
 }
 
-/// Erinnerung (lokale Zeit). Alles optional; Fälligkeitsdaten allein erinnern nicht.
+/// Reminder (local time). Everything is optional; due dates alone do not remind.
 #[derive(Clone, Default, Deserialize, Serialize)]
 pub struct Remind {
     #[serde(default, rename = "remind_at", skip_serializing_if = "Option::is_none")]
@@ -79,7 +79,7 @@ pub struct Remind {
 }
 
 impl Remind {
-    /// Neue Erinnerung setzen; frühere Meldung und Schlummern gelten nicht mehr.
+    /// Set a new reminder; an earlier notification and snooze no longer apply.
     pub fn set(&mut self, at: Option<NaiveDateTime>) {
         *self = Self {
             at,
@@ -88,7 +88,7 @@ impl Remind {
         };
     }
 
-    /// Nächster Meldezeitpunkt, falls noch nicht gemeldet.
+    /// Next notification time, if not yet notified.
     pub fn due_at(&self) -> Option<NaiveDateTime> {
         if self.reminded.is_some() {
             return None;
@@ -97,14 +97,14 @@ impl Remind {
     }
 }
 
-/// Veröffentlichter Stand eines Updates. Der Changelog-Text ist ohne Versions-Header gespeichert.
+/// Published state of an update. The changelog text is stored without a version header.
 #[derive(Clone, Deserialize, Serialize)]
 pub struct Release {
     pub version: String,
     pub changelog: String,
-    /// Unix-Millisekunden der Veröffentlichung.
+    /// Unix milliseconds of the publication.
     pub at: i64,
-    /// Status vor der Veröffentlichung (für "Veröffentlichung zurücknehmen").
+    /// Status before publication (for "Veröffentlichung zurücknehmen", i.e. withdrawing the publication).
     pub previous_status: Status,
 }
 
@@ -118,7 +118,7 @@ pub struct Task {
     pub done: bool,
     #[serde(default)]
     pub planned_for: Option<NaiveDate>,
-    /// Unteraufgabe der vorhergehenden Hauptaufgabe (eine Ebene tief).
+    /// Subtask of the preceding main task (one level deep).
     #[serde(default)]
     pub sub: bool,
     #[serde(default)]
@@ -157,10 +157,10 @@ pub struct Update {
     pub tasks: Vec<Task>,
     #[serde(default)]
     pub archived: bool,
-    /// Gesetzt = im Papierkorb (wird nach `TRASH_DAYS` Tagen endgültig entfernt).
+    /// Set = in the trash (removed permanently after `TRASH_DAYS` days).
     #[serde(default)]
     pub deleted_on: Option<NaiveDate>,
-    /// Unix-Millisekunden der letzten Bearbeitung (0 = unbekannt).
+    /// Unix milliseconds of the last edit (0 = unknown).
     #[serde(default)]
     pub edited_at: i64,
     #[serde(default)]
@@ -208,7 +208,7 @@ impl Update {
             .any(|t| t.to_lowercase() == tag)
     }
 
-    /// Titel oder, wenn leer, die erste Textzeile der Notiz (ohne Markdown-Präfix).
+    /// The title or, if empty, the first text line of the note (without a Markdown prefix).
     pub fn display_title(&self) -> Option<String> {
         let title = self.title.trim();
         if !title.is_empty() {
@@ -226,7 +226,7 @@ impl Update {
             .filter(|title| !title.is_empty())
     }
 
-    /// Fortschritt über alle Aufgaben inklusive Unteraufgaben.
+    /// Progress across all tasks including subtasks.
     pub fn task_progress(&self) -> (usize, usize) {
         (
             self.tasks.iter().filter(|task| task.done).count(),
@@ -242,7 +242,7 @@ impl Update {
         self.edited_at = now_millis();
     }
 
-    /// Ist der Termin des Updates überfällig?
+    /// Is the update's due date overdue?
     pub fn overdue(&self, today: NaiveDate) -> bool {
         self.status != Status::Erledigt && self.planned_for.is_some_and(|d| d < today)
     }
@@ -426,7 +426,7 @@ pub struct Settings {
     pub start_view: StartView,
     #[serde(default = "yes")]
     pub undo_instead_of_dialog: bool,
-    /// Tage im Papierkorb; 0 = nie automatisch leeren.
+    /// Days in the trash; 0 = never empty automatically.
     #[serde(default = "default_trash_days")]
     pub trash_days: u32,
     #[serde(default)]
@@ -524,7 +524,7 @@ pub struct Settings {
     #[serde(default)]
     pub seen_version: Option<String>,
 
-    // Layout-Gedächtnis
+    // Layout memory
     #[serde(default = "default_list_width")]
     pub list_width: f32,
     #[serde(default = "yes")]
@@ -607,7 +607,7 @@ fn default_hotkey() -> String {
 
 impl Default for Settings {
     fn default() -> Self {
-        // Einzige Quelle der Standardwerte: serde-Defaults.
+        // The only source of default values: serde defaults.
         let mut settings: Self =
             serde_json::from_str("{}").expect("leere Einstellungen sind gültig");
         settings.templates = vec![Template::release()];
@@ -637,7 +637,7 @@ pub struct StandaloneTask {
     pub remind: Remind,
 }
 
-/// Kleine Notiz ohne Titel und Status: Reihenfolge = Position in `Workspace::stickies`.
+/// Small note without a title and status: order = position in `Workspace::stickies`.
 #[derive(Clone, Default, Deserialize, Serialize)]
 pub struct Sticky {
     pub id: u64,
@@ -723,7 +723,7 @@ impl Workspace {
         counts
     }
 
-    /// Neues Post-it ganz vorn; die Farbe wechselt reihum.
+    /// New post-it at the very front; the color rotates.
     pub fn new_sticky(&mut self) -> u64 {
         let id = self.next_id();
         let color = (self.stickies.len() % crate::palette::STICKY_COLORS.len()) as u8;
@@ -740,7 +740,7 @@ impl Workspace {
         id
     }
 
-    /// Verschiebt ein Post-it vor `before` (am Ende, wenn `None` oder unbekannt).
+    /// Moves a post-it before `before` (to the end if `None` or unknown).
     pub fn move_sticky(&mut self, id: u64, before: Option<u64>) {
         let Some(from) = self.stickies.iter().position(|s| s.id == id) else {
             return;
@@ -825,7 +825,7 @@ impl Workspace {
         Some(id)
     }
 
-    /// Kopie eines Updates mit Aufgaben, ohne Datum.
+    /// Copy of an update with its tasks, without a date.
     pub fn duplicate(&mut self, id: u64) -> Option<u64> {
         let mut copy = self.update(id)?.clone();
         copy.id = self.next_id();
@@ -889,13 +889,13 @@ impl Workspace {
         self.next_id = self.next_id.max(max_id.saturating_add(1));
     }
 
-    /// Hebt ältere Schemas auf die aktuelle Version. Gibt `true` zurück,
-    /// wenn etwas geändert wurde (Aufrufer sichert dann vorher die Datei).
+    /// Raises older schemas to the current version. Returns `true`
+    /// if something changed (the caller then backs up the file first).
     pub fn migrate(&mut self) -> bool {
         if self.schema_version >= SCHEMA_VERSION {
             return false;
         }
-        // Neue Einstellungsfelder füllt serde mit Defaults; hier nur Wertebereiche prüfen.
+        // serde fills new settings fields with defaults; only check value ranges here.
         self.settings.max_pills = self.settings.max_pills.clamp(2, 4);
         self.settings.list_width = self.settings.list_width.clamp(300., 520.);
         for u in &mut self.updates {
@@ -913,7 +913,7 @@ impl Workspace {
         true
     }
 
-    /// Setzt fehlende Erstellzeiten auf den Änderungszeitpunkt der Datendatei.
+    /// Sets missing creation times to the modification time of the data file.
     pub fn fill_created_at(&mut self, fallback: i64) {
         for u in &mut self.updates {
             if u.created_at <= 0 {
@@ -922,7 +922,7 @@ impl Workspace {
         }
     }
 
-    /// Entfernt Papierkorb-Einträge, die älter als `TRASH_DAYS` sind.
+    /// Removes trash entries older than `TRASH_DAYS`.
     pub fn purge_trash(&mut self, today: NaiveDate) -> usize {
         let before = self.updates.len();
         let days = self.settings.trash_days;
@@ -937,8 +937,8 @@ impl Workspace {
         before - self.updates.len()
     }
 
-    /// Fügt Updates aus einem Backup hinzu (neue IDs). Identische Einträge
-    /// (Titel, Termin, Notizen) werden übersprungen. Gibt (neu, übersprungen) zurück.
+    /// Adds updates from a backup (new IDs). Identical entries
+    /// (title, date, notes) are skipped. Returns (new, skipped).
     pub fn merge(&mut self, other: Workspace) -> (usize, usize) {
         let (mut added, mut skipped) = (0, 0);
         for mut update in other.updates {

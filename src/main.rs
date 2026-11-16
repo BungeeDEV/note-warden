@@ -71,7 +71,7 @@ actions!(
     ]
 );
 
-/// Wird aus der Markdown-Vorschau gesendet (Checkbox angeklickt).
+/// Sent from the Markdown preview (a checkbox was clicked).
 #[derive(Clone, PartialEq, Action)]
 #[action(namespace = note_warden, no_json)]
 pub struct NoteTaskToggle {
@@ -179,7 +179,7 @@ impl GroupBy {
 pub enum DateTarget {
     Update(u64),
     Task(u64, u64),
-    /// Datum für das Quick-Add-Feld der Heute-Ansicht.
+    /// Date for the quick-add field of the Today view.
     Quick,
     Inbox(u64),
 }
@@ -194,21 +194,21 @@ pub struct DatePop {
 #[derive(Clone, PartialEq, Eq)]
 pub enum Dialog {
     Shortcuts,
-    /// Release-Dialog: veröffentlichen oder (bei vorhandenem Release) bearbeiten.
+    /// Release dialog: publish or (if a release exists) edit.
     Publish(u64),
     ConfirmPurge(u64),
     ConfirmTrash(u64),
     Import,
-    /// Änderungsprotokoll der App (CHANGELOG.md, ohne Netzwerk).
+    /// The app's changelog (CHANGELOG.md, no network).
     AppChangelog,
     Licenses,
     ConfirmEmptyTrash,
     ConfirmWipe,
     Template,
-    /// Daten wurden automatisch aus einer Sicherung (Unix-ms) wiederhergestellt.
+    /// Data was restored automatically from a backup (Unix ms).
     Recovered(i64),
     ConfirmRestore(i64),
-    /// Release-Notes der verfügbaren App-Version.
+    /// Release notes of the available app version.
     UpdateNotes,
 }
 
@@ -289,11 +289,11 @@ pub enum Undo {
     },
     Trashed(u64),
     Archived(u64),
-    /// Vollständiger Stand eines Updates vor Veröffentlichen/Zurücknehmen.
+    /// Full state of an update before publishing/withdrawing.
     Update(Box<model::Update>),
-    /// Notiztext vor einer Wiederherstellung aus dem Versionsverlauf.
+    /// Note text before a restore from the version history.
     Notes(u64, String),
-    /// Gelöschtes Post-it samt Position.
+    /// Deleted post-it including its position.
     Sticky(usize, model::Sticky),
 }
 
@@ -302,18 +302,18 @@ pub struct Toast {
     pub message: String,
     pub undo: Option<Undo>,
     pub created: Instant,
-    /// Bereits sichtbare Zeit in ms; pausiert bei Hover/Fokus.
+    /// Time already shown in ms; pauses on hover/focus.
     pub elapsed_ms: u64,
     pub paused: bool,
-    /// Zusätzliche Schaltflächen (Erinnerungen); solche Toasts bleiben bis zum Schließen stehen.
+    /// Additional buttons (reminders); such toasts stay until they are closed.
     pub actions: Vec<(String, ToastAction)>,
 }
 
-/// Sichtbarkeit des Splash-Screens beim Start.
+/// Visibility of the splash screen on start.
 #[derive(Clone, Copy, PartialEq)]
 pub enum Splash {
     Showing,
-    /// Fade-out läuft seit dem Zeitpunkt.
+    /// The fade-out has been running since this point in time.
     Fading(Instant),
     Gone,
 }
@@ -321,7 +321,7 @@ pub enum Splash {
 pub const SPLASH_MIN_MS: u64 = 500;
 pub const SPLASH_FADE_MS: u64 = 200;
 
-/// Seitenpanel "Versionsverlauf" eines Updates; `snapshots` älteste zuerst, `selected` indiziert dort.
+/// "Versionsverlauf" (version history) side panel of an update; `snapshots` oldest first, `selected` indexes into it.
 pub struct HistoryPanel {
     pub update_id: u64,
     pub snapshots: Vec<storage::Snapshot>,
@@ -335,7 +335,7 @@ pub struct ImportPreview {
     pub tasks: usize,
 }
 
-/// Kontextmenü eines Kalendereintrags (Rechtsklick).
+/// Context menu of a calendar entry (right click).
 #[derive(Clone, Copy)]
 pub struct PillMenu {
     pub update_id: u64,
@@ -440,7 +440,7 @@ pub struct NoteWarden {
     pub editing_task: Option<u64>,
     pub expanded_task: Option<u64>,
     pub hide_done: bool,
-    /// Update, bei dem der Nutzer trotz Status "Erledigt" bewusst "Schreiben" gewählt hat.
+    /// Update for which the user deliberately chose "Schreiben" (write) despite the status "Erledigt" (done).
     pub edit_forced: Option<u64>,
     pub resizing_list: bool,
     pub views_open: bool,
@@ -1056,7 +1056,7 @@ impl NoteWarden {
         }
     }
 
-    /// Startansicht, Kalender-Standard und gemerkte Layout-Werte aus den Einstellungen.
+    /// Start view, calendar default and remembered layout values from the settings.
     fn apply_startup_settings(&mut self) {
         let st = &self.workspace.settings;
         self.cal_mode = match st.cal_view {
@@ -1083,7 +1083,7 @@ impl NoteWarden {
         self.ensure_view_visible();
     }
 
-    /// Tray-Verhalten, Hotkey, Ereigniskanal und Erinnerungen.
+    /// Tray behavior, hotkey, event channel and reminders.
     fn start_system(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let st = &self.workspace.settings;
         let tray_mode = st.tray_on_close && st.reminders_on;
@@ -1177,7 +1177,7 @@ impl NoteWarden {
         }
     }
 
-    /// Update-Prüfung im Hintergrund; `manual` zeigt auch "aktuell" und Fehler als Hinweis.
+    /// Update check in the background; `manual` also shows "up to date" and errors as a notice.
     pub fn check_updates(&mut self, manual: bool, cx: &mut Context<Self>) {
         if !updater::configured() {
             if manual {
@@ -1200,7 +1200,7 @@ impl NoteWarden {
         cx.notify();
     }
 
-    /// Sichert, startet den geprüften Installer und beendet die App.
+    /// Backs up, starts the verified installer and quits the app.
     pub fn install_update(&mut self, path: std::path::PathBuf, cx: &mut Context<Self>) {
         self.snapshot_pending();
         if !self.backup_now(false) {
@@ -1216,7 +1216,7 @@ impl NoteWarden {
         }
     }
 
-    /// Backups: beim Start (wenn das letzte älter als 1 Stunde ist), danach alle 30 Minuten bei Änderungen.
+    /// Backups: on start (if the last one is older than 1 hour), then every 30 minutes when there are changes.
     fn start_backups(&mut self, cx: &mut Context<Self>) {
         let cutoff = self.now_today() - Duration::days(6);
         self.workspace
@@ -1252,7 +1252,7 @@ impl NoteWarden {
         .detach();
     }
 
-    /// Sichert den aktuellen Stand; `pinned` = manuell, wird nie automatisch gelöscht.
+    /// Backs up the current state; `pinned` = manual, never deleted automatically.
     pub fn backup_now(&mut self, pinned: bool) -> bool {
         if !self.writable {
             return false;
@@ -1272,7 +1272,7 @@ impl NoteWarden {
         }
     }
 
-    /// Liste der Backups samt Anzahl Updates neu einlesen (nur für die Einstellungen).
+    /// Re-read the list of backups with their update counts (only for the settings).
     pub fn refresh_backups(&mut self) {
         self.backups = storage::list_backups(&self.path)
             .into_iter()
@@ -1340,7 +1340,7 @@ impl NoteWarden {
 
     // ---------- Speichern ----------
 
-    /// Vormerken; geschrieben wird nach kurzer Ruhe (Debounce ~400 ms).
+    /// Queue a save; it is written after a short pause (debounce ~400 ms).
     pub fn persist(&mut self, cx: &mut Context<Self>) {
         self.peer_dirty = true;
         self.persist_local(cx);
@@ -1370,7 +1370,7 @@ impl NoteWarden {
                 }
             })
             .ok();
-            // Nach 2 Sekunden schrumpft "Gespeichert" auf das dezente Check-Icon.
+            // After 2 seconds "Gespeichert" (saved) shrinks to the subtle check icon.
             cx.background_executor()
                 .timer(StdDuration::from_millis(2100))
                 .await;
@@ -1781,7 +1781,7 @@ impl NoteWarden {
         }
     }
 
-    /// Entfernt eine Aufgabe samt Unteraufgaben (mit Undo-Toast).
+    /// Removes a task including its subtasks (with an undo toast).
     pub fn delete_task(&mut self, update_id: u64, task_id: u64, cx: &mut Context<Self>) {
         if !self.writable {
             return;
@@ -1817,7 +1817,7 @@ impl NoteWarden {
             && let Some(index) = update.tasks.iter().position(|t| t.id == task_id)
             && (index > 0 || !sub)
         {
-            // Hauptaufgaben mit eigenen Unteraufgaben werden nicht eingerückt (nur eine Ebene).
+            // Main tasks that have subtasks of their own are not indented (only one level).
             let has_children = update.tasks.get(index + 1).is_some_and(|t| t.sub);
             if sub && has_children && !update.tasks[index].sub {
                 return;
@@ -1828,7 +1828,7 @@ impl NoteWarden {
         }
     }
 
-    /// Verschiebt eine Aufgabe (bei Hauptaufgaben samt Unteraufgaben) vor `before`
+    /// Moves a task (including its subtasks for main tasks) before `before`
     /// bzw. ans Ende.
     pub fn move_task(
         &mut self,
@@ -1868,7 +1868,7 @@ impl NoteWarden {
                 at += 1;
             }
         }
-        // Ein Block, der vor eine Unteraufgabe fällt, rutscht hinter deren Gruppe (oben).
+        // A block that would land before a subtask slips behind that group (above).
         let first_becomes_main = at == 0;
         update.tasks.splice(at..at, block);
         if first_becomes_main {
@@ -1879,7 +1879,7 @@ impl NoteWarden {
         cx.notify();
     }
 
-    /// Alt+↑/↓: Aufgabe auf ihrer Ebene um eine Position verschieben.
+    /// Alt+↑/↓: move a task by one position within its level.
     pub fn nudge_task(&mut self, update_id: u64, task_id: u64, up: bool, cx: &mut Context<Self>) {
         let Some(update) = self.workspace.update(update_id) else {
             return;
@@ -1905,7 +1905,7 @@ impl NoteWarden {
             if pos + 1 >= same.len() {
                 return;
             }
-            // vor das übernächste Element gleicher Ebene bzw. ans Ende
+            // before the next-but-one element of the same level, or to the end
             let before = same.get(pos + 2).map(|&k| tasks[k].id);
             self.move_task(update_id, task_id, before, cx);
         }
@@ -2209,7 +2209,7 @@ impl NoteWarden {
         result
     }
 
-    /// Alle Updates mit ungesicherten Textänderungen sofort festhalten (Wechsel, Beenden).
+    /// Immediately capture all updates with unsaved text changes (switching, quitting).
     pub fn snapshot_pending(&mut self) {
         if !self.writable {
             return;
@@ -2219,7 +2219,7 @@ impl NoteWarden {
         }
     }
 
-    /// Nach einer Textänderung: Ausgangstext sichern (erste Änderung) und nach 60 s Ruhe einen Snapshot anlegen.
+    /// After a text change: keep the original text (first change) and create a snapshot after 60 s of inactivity.
     fn note_edited(&mut self, id: u64, previous: &str, cx: &mut Context<Self>) {
         if !self.writable {
             return;
@@ -2364,7 +2364,7 @@ impl NoteWarden {
             cx.notify();
             return;
         }
-        // Esc schließt zuerst einen Dialog über den Einstellungen, dann die Einstellungen.
+        // Esc closes a dialog above the settings first, then the settings.
         if self.dialog.is_none() && self.tpl_edit.is_none() && self.settings_open {
             self.settings_open = false;
         }
@@ -2418,7 +2418,7 @@ impl NoteWarden {
         cx.notify();
     }
 
-    /// Ändert Einstellungen: persistiert, wendet Look sofort an und zeigt „Gespeichert“.
+    /// Changes settings: persists them, applies the look immediately and shows "Gespeichert" (saved).
     pub fn update_settings(
         &mut self,
         cx: &mut Context<Self>,
@@ -2492,7 +2492,7 @@ impl NoteWarden {
 
     // ---------- Kalender ----------
 
-    /// Enter legt ein Update an, Strg+Enter eine Aufgabe im ausgewählten Update.
+    /// Enter creates an update, Ctrl+Enter a task in the selected update.
     pub fn commit_calendar_inline(
         &mut self,
         as_task: bool,
@@ -2532,7 +2532,7 @@ impl NoteWarden {
         cx.notify();
     }
 
-    /// Fokus (Pfeiltasten) durch die Tage bewegen; springt bei Bedarf in den Nachbarmonat.
+    /// Move the focus (arrow keys) through the days; jumps to the neighboring month if needed.
     pub fn move_cal_focus(&mut self, days: i64, cx: &mut Context<Self>) {
         let from = self.cal_focus.unwrap_or(self.cal_anchor);
         let to = from + Duration::days(days);
@@ -2566,7 +2566,7 @@ impl NoteWarden {
         day: Option<NaiveDate>,
         cx: &mut Context<Self>,
     ) {
-        // Erste erfolgreiche Zuordnung aus „Ohne Termin“ blendet den Hinweis aus.
+        // The first successful assignment from "Ohne Termin" (no date) hides the hint.
         let had_no_date = match item {
             ui::CalItem::Update(id, _) => self
                 .workspace
@@ -2691,7 +2691,7 @@ impl NoteWarden {
         if !self.writable {
             return;
         }
-        // Vorher sichern, damit auch "Ersetzen" nie stillschweigend Daten vernichtet.
+        // Back up first so that even "Ersetzen" (replace) never silently destroys data.
         if !self.backup_now(false) {
             self.toast("Import abgebrochen: Backup nicht möglich", None, cx);
             return;
@@ -2767,7 +2767,7 @@ gpui_kit::assets::icon_assets!(
     ]
 );
 
-/// Standard-Icons plus die wenigen zusätzlichen Lucide-Icons der Editor-Leiste.
+/// Default icons plus the few additional Lucide icons of the editor toolbar.
 struct AppAssets;
 
 impl AssetSource for AppAssets {
@@ -2873,8 +2873,8 @@ fn main() {
             KeyBinding::new("enter", TaskEditKey, Some("TaskRow")),
             KeyBinding::new("delete", TaskDeleteKey, Some("TaskRow")),
         ]);
-        // Theme, Akzent und Fenstergröße aus der kleinen Prefs-Datei, noch vor dem Laden
-        // des Arbeitsbereichs: kein Aufblitzen im falschen Theme.
+        // Theme, accent and window size from the small prefs file, before loading
+        // the workspace: no flash in the wrong theme.
         let prefs = storage::read_prefs(&storage::data_path());
         let initial = model::Settings {
             theme: prefs.theme,

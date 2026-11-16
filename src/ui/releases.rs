@@ -8,7 +8,7 @@ const PREVIEW_LINES: usize = 6;
 impl NoteWarden {
     // ---------- Aktionen ----------
 
-    /// Öffnet den Release-Dialog; bei vorhandenem Release wird dieser bearbeitet.
+    /// Opens the release dialog; if a release exists, it is edited.
     pub fn open_publish(&mut self, id: u64, window: &mut Window, cx: &mut Context<Self>) {
         let Some(update) = self.workspace.update(id) else {
             return;
@@ -43,7 +43,7 @@ impl NoteWarden {
             .update(cx, |input, cx| input.focus(window, cx));
     }
 
-    /// "Offene Aufgaben als erledigt markieren": erzeugter Text wird mitgeführt, solange er nicht bearbeitet wurde.
+    /// "Offene Aufgaben als erledigt markieren" (mark open tasks as done): the generated text is carried along as long as it has not been edited.
     pub fn set_release_close_open(
         &mut self,
         on: bool,
@@ -149,7 +149,7 @@ impl NoteWarden {
         cx.notify();
     }
 
-    /// Alle Releases des gewählten Projekts (oder aller), neueste zuerst.
+    /// All releases of the selected project (or of all), newest first.
     fn releases(&self) -> Vec<(&model::Update, &Release)> {
         let mut list: Vec<_> = self
             .workspace

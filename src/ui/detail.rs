@@ -1473,7 +1473,7 @@ impl NoteWarden {
     }
 }
 
-/// Stabiler Zahlenschlüssel für Toolbar-Button-IDs.
+/// Stable numeric key for toolbar button IDs.
 fn icon_index(icon: IconName) -> usize {
     icon as usize
 }

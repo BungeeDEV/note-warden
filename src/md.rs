@@ -1,11 +1,11 @@
-//! Markdown-Hilfen: Editor-Bearbeitungen (reine Funktionen auf Text + Auswahl),
-//! Export und Changelog. Offsets sind immer UTF-8-Byteoffsets.
+//! Markdown helpers: editor edits (pure functions on text + selection),
+//! export and changelog. Offsets are always UTF-8 byte offsets.
 
 use crate::model::{ChangeKind, Task, Update};
 use std::ops::Range;
 
-/// Ersetze `range` durch `text` und setze danach die Auswahl auf `sel`
-/// (Offsets beziehen sich auf den neuen Text).
+/// Replace `range` with `text` and then set the selection to `sel`
+/// (offsets refer to the new text).
 #[derive(Debug, PartialEq, Eq)]
 pub struct Edit {
     pub range: Range<usize>,
@@ -37,7 +37,7 @@ struct ListPrefix {
     indent: String,
     marker: String,
     checkbox: bool,
-    /// Länge des gesamten Präfixes inklusive Leerzeichen danach.
+    /// Length of the entire prefix including the space after it.
     len: usize,
 }
 
@@ -114,7 +114,7 @@ pub fn list_enter(text: &str, sel: Range<usize>) -> Option<Edit> {
     })
 }
 
-/// Tab / Shift+Tab: Listenpunkte (oder markierte Zeilen) ein- bzw. ausrücken.
+/// Tab / Shift+Tab: indent or outdent list items (or selected lines).
 pub fn indent_lines(text: &str, sel: Range<usize>, outdent: bool) -> Option<Edit> {
     if sel.end > text.len() {
         return None;
@@ -180,7 +180,7 @@ pub fn indent_lines(text: &str, sel: Range<usize>, outdent: bool) -> Option<Edit
     })
 }
 
-/// Automatisches Schließen von Klammern/Backticks beim Tippen.
+/// Automatic closing of brackets/backticks while typing.
 pub fn auto_pair(text: &str, sel: Range<usize>, typed: char) -> Option<Edit> {
     if sel.end > text.len() {
         return None;
@@ -235,7 +235,7 @@ pub fn auto_pair(text: &str, sel: Range<usize>, typed: char) -> Option<Edit> {
     })
 }
 
-/// Einfügen einer URL über markierten Text erzeugt einen Link.
+/// Pasting a URL over selected text creates a link.
 pub fn paste_link(text: &str, sel: Range<usize>, clipboard: &str) -> Option<Edit> {
     let url = clipboard.trim();
     let is_url = (url.starts_with("http://") || url.starts_with("https://"))
@@ -323,7 +323,7 @@ fn line_prefix(text: &str, sel: Range<usize>, prefix: &str) -> Edit {
     }
 }
 
-/// Werkzeugleiste: wendet ein Format auf die Auswahl an.
+/// Toolbar: applies a format to the selection.
 pub fn apply_format(text: &str, sel: Range<usize>, format: Format) -> Edit {
     let sel = sel.start.min(text.len())..sel.end.min(text.len());
     match format {
@@ -341,7 +341,7 @@ pub fn apply_format(text: &str, sel: Range<usize>, format: Format) -> Edit {
                 &text[sel.clone()]
             };
             let replacement = format!("[{inner}](https://)");
-            // Bei Auswahl: URL markieren, sonst den Platzhalter "Text".
+            // With a selection: select the URL, otherwise the placeholder "Text".
             let new_sel = if sel.start == sel.end {
                 sel.start + 1..sel.start + 1 + inner.len()
             } else {
@@ -357,7 +357,7 @@ pub fn apply_format(text: &str, sel: Range<usize>, format: Format) -> Edit {
     }
 }
 
-/// Schreibt den neuen Zustand einer Aufgabenlisten-Checkbox (`marker` = `[ ]` / `[x]`).
+/// Writes the new state of a task-list checkbox (`marker` = `[ ]` / `[x]`).
 pub fn set_task_marker(text: &str, marker: Range<usize>, checked: bool) -> Option<String> {
     let slot = text.get(marker.clone())?;
     if slot.len() != 3 || !slot.starts_with('[') || !slot.ends_with(']') {
@@ -382,7 +382,7 @@ fn yaml_quote(value: &str) -> String {
     )
 }
 
-/// Export eines Updates als Markdown mit Frontmatter und Checkliste.
+/// Export of an update as Markdown with front matter and a checklist.
 pub fn export_update(update: &Update) -> String {
     let mut out = String::from("---\n");
     out.push_str(&format!("title: {}\n", yaml_quote(&update.title)));
@@ -419,9 +419,9 @@ pub fn export_update(update: &Update) -> String {
     out
 }
 
-/// Einzige Stelle, die das Standard-Changelog-Format erzeugt: Abschnitte Added/Changed/Removed,
-/// Einträge `* HEADING: Beschreibung` (ohne Beschreibung nur `* HEADING`), leere Abschnitte entfallen.
-/// Ohne Datum, Emojis oder Links. Mit `version` beginnt der Text mit `## <version>`.
+/// The only place that produces the standard changelog format: sections Added/Changed/Removed,
+/// entries `* HEADING: description` (just `* HEADING` without a description), empty sections are omitted.
+/// Without dates, emojis or links. With `version`, the text starts with `## <version>`.
 pub fn format_changelog(version: Option<&str>, tasks: &[Task], only_done: bool) -> String {
     let mut sections = Vec::new();
     for kind in ChangeKind::ALL {
@@ -472,7 +472,7 @@ pub fn format_changelog(version: Option<&str>, tasks: &[Task], only_done: bool) 
     }
 }
 
-/// Ein Release im Standardformat: `## <version>`, Leerzeile, Changelog-Text.
+/// A release in the standard format: `## <version>`, blank line, changelog text.
 pub fn release_block(version: &str, body: &str) -> String {
     let body = body.trim();
     if body.is_empty() {
@@ -487,7 +487,7 @@ pub fn release_block(version: &str, body: &str) -> String {
     }
 }
 
-/// Datei mit allen Versionen, neueste zuerst, Blöcke durch eine Leerzeile getrennt.
+/// File with all versions, newest first, blocks separated by a blank line.
 pub fn changelog_file(releases: &[(&str, &str)]) -> String {
     let blocks: Vec<String> = releases
         .iter()
@@ -518,12 +518,12 @@ pub fn is_version(text: &str) -> bool {
     parse_version(text).is_some()
 }
 
-/// Ist `candidate` eine gültige und höhere Version als `current`?
+/// Is `candidate` a valid version and higher than `current`?
 pub fn is_newer(candidate: &str, current: &str) -> bool {
     matches!((parse_version(candidate), parse_version(current)), (Some(a), Some(b)) if a > b)
 }
 
-/// Nächste Version nach der höchsten gültigen `x.y.z` der Liste (Minor-Sprung oder Patch).
+/// Next version after the highest valid `x.y.z` in the list (minor bump or patch).
 pub fn suggest_version(existing: &[&str], minor: bool) -> Option<String> {
     let (major, mi, patch) = existing.iter().filter_map(|v| parse_version(v)).max()?;
     Some(if minor {
@@ -599,7 +599,7 @@ mod tests {
             "- a\n- b"
         );
         assert!(indent_lines("- a", 3..3, true).is_none());
-        // Normale Zeile: Tab fügt Leerzeichen ein.
+        // Normal line: Tab inserts spaces.
         assert_eq!(
             apply("abc", &indent_lines("abc", 1..1, false).unwrap()),
             "a  bc"
@@ -611,17 +611,17 @@ mod tests {
         let edit = auto_pair("ab ", 3..3, '(').unwrap();
         assert_eq!(apply("ab ", &edit), "ab ()");
         assert_eq!(edit.sel, 4..4);
-        // Überspringen des schließenden Zeichens
+        // Skipping over the closing character
         let edit = auto_pair("ab ()", 4..4, ')').unwrap();
         assert_eq!(apply("ab ()", &edit), "ab ()");
         assert_eq!(edit.sel, 5..5);
-        // Markierter Text wird umschlossen
+        // Selected text is wrapped
         let edit = auto_pair("wort", 0..4, '`').unwrap();
         assert_eq!(apply("wort", &edit), "`wort`");
         assert_eq!(edit.sel, 1..5);
         // Kein Auto-Close vor Text
         assert!(auto_pair("abc", 0..0, '(').is_none());
-        // Dreifach-Backtick bleibt möglich
+        // Triple backticks remain possible
         assert!(auto_pair("``", 2..2, '`').is_none());
     }
 

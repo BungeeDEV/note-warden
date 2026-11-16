@@ -157,8 +157,8 @@ impl NoteWarden {
         due.overdue.len() + due.today.len()
     }
 
-    /// Abhaken in der Heute-Ansicht: Zeile bleibt 800 ms (durchgestrichen) und wechselt dann
-    /// in „Erledigt heute“.
+    /// Checking off in the Today view: the row stays for 800 ms (struck through) and then moves
+    /// into "Erledigt heute" (done today).
     pub fn complete_item(&mut self, uid: u64, tid: Option<u64>, cx: &mut Context<Self>) {
         if !self.writable {
             return;
@@ -248,7 +248,7 @@ impl NoteWarden {
         cx.notify();
     }
 
-    /// Enter erfasst eine Inbox-Aufgabe; Strg+Enter erstellt ein Update.
+    /// Enter captures an inbox task; Ctrl+Enter creates an update.
     pub fn commit_quick_add(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.commit_capture(self.quick_input.clone(), window, cx);
     }
@@ -625,7 +625,7 @@ impl NoteWarden {
         use chrono::Datelike as _;
         let p = palette::get(cx);
         let today = self.now_today();
-        // Ein einziger Anker (`home_day`): Streifen, Auswahl und Navigation bleiben konsistent.
+        // A single anchor (`home_day`): strip, selection and navigation stay consistent.
         let week_start = self.workspace.settings.week_start;
         let start = dates::week_start(self.home_day, week_start);
         let off_week = start != dates::week_start(today, week_start);
@@ -1234,7 +1234,7 @@ impl NoteWarden {
                     }),
             )
     }
-    /// Karte "Erinnerungen": heutige Erinnerungen; ohne Einträge gibt es keine Karte.
+    /// "Erinnerungen" (reminders) card: today's reminders; without entries there is no card.
     fn reminders_card(&self, p: &Palette, cx: &mut Context<Self>) -> Option<AnyElement> {
         let items = self.reminders_today();
         if items.is_empty() {
