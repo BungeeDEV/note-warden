@@ -5,8 +5,8 @@ use gpui_kit::component::input::{
     Enter, Escape, MoveDown, MoveLeft, MovePageDown, MovePageUp, MoveRight, MoveUp,
 };
 
-/// Fuzzy-Treffer: alle Zeichen der Eingabe in Reihenfolge, Bonus für zusammenhängende
-/// Treffer und Wortanfänge. `None` = kein Treffer.
+/// Fuzzy match: all characters of the input in order, a bonus for contiguous
+/// matches and word starts. `None` = no match.
 pub fn fuzzy_score(query: &str, text: &str) -> Option<i32> {
     let query: Vec<char> = query
         .to_lowercase()
@@ -51,11 +51,13 @@ pub enum PaletteAction {
     GoBoard,
     ToggleTheme,
     ToggleSidebar,
+    ToggleCompact,
     ExportBackup,
     ImportBackup,
     Settings,
     Shortcuts,
     GoReleases,
+    GoStickies,
     Publish,
     BackupNow,
     CheckUpdates,
@@ -84,6 +86,11 @@ impl NoteWarden {
         }
         let mut items = vec![
             command("Neues Update", "Strg+N", PaletteAction::NewUpdate),
+            command(
+                "Notizzettel öffnen",
+                "Strg+Umschalt+M",
+                PaletteAction::ToggleCompact,
+            ),
             command("Zur Heute-Ansicht", "Strg+1", PaletteAction::GoToday),
             command("Zu den Updates", "Strg+2", PaletteAction::GoUpdates),
             command("Zur Inbox", "", PaletteAction::GoInbox),
@@ -100,6 +107,7 @@ impl NoteWarden {
                 PaletteAction::ToggleSidebar,
             ),
             command("Gehe zu Releases", "", PaletteAction::GoReleases),
+            command("Gehe zu Post-its", "", PaletteAction::GoStickies),
             command("Jetzt sichern", "Backup", PaletteAction::BackupNow),
             command("Nach Updates suchen", "", PaletteAction::CheckUpdates),
             command("Backup exportieren", "JSON", PaletteAction::ExportBackup),
@@ -150,6 +158,7 @@ impl NoteWarden {
         self.palette_open = false;
         self.focus_handle.focus(window, cx);
         match item.action {
+            PaletteAction::ToggleCompact => self.toggle_popup(window, cx),
             PaletteAction::QuickAdd(text) => {
                 self.quick_input
                     .update(cx, |input, cx| input.set_value(text, window, cx));
@@ -169,6 +178,7 @@ impl NoteWarden {
             PaletteAction::Settings => self.open_settings(None, window, cx),
             PaletteAction::Shortcuts => self.open_dialog(Dialog::Shortcuts, window, cx),
             PaletteAction::GoReleases => self.set_view(View::Releases, cx),
+            PaletteAction::GoStickies => self.set_view(View::Stickies, cx),
             PaletteAction::Publish => {
                 if let Some(id) = self.selected_update {
                     self.open_publish(id, window, cx);
@@ -499,7 +509,7 @@ impl NoteWarden {
             ))
     }
 
-    /// Zeile "Erinnerung" im Datums-Popover (nur für Updates, Aufgaben und Inbox-Einträge).
+    /// "Erinnerung" (reminder) row in the date popover (only for updates, tasks and inbox entries).
     fn reminder_row(
         &self,
         date_target: DateTarget,
@@ -693,7 +703,7 @@ impl NoteWarden {
         )
     }
 
-    /// Dezente Leiste: Update verfügbar, Fortschritt oder bereit zum Neustart.
+    /// Subtle bar: update available, progress or ready to restart.
     pub(super) fn update_banner(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let p = palette::get(cx);
         let state = self
@@ -810,7 +820,7 @@ impl NoteWarden {
         }
     }
 
-    /// Ruhiger Hinweis nach automatischer Wiederherstellung (schließbar).
+    /// Calm notice after an automatic restore (dismissible).
     pub(super) fn restore_banner(&self, at: i64, cx: &mut Context<Self>) -> impl IntoElement {
         let p = palette::get(cx);
         let when = dates::full_time(at).unwrap_or_default();

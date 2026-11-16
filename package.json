@@ -2,7 +2,7 @@
   "name": "note-warden-branding",
   "private": true,
   "version": "1.1.0",
-  "description": "Nur Werkzeuge für das Branding (Logo, Icons); die App selbst ist Rust.",
+  "description": "Branding tools only (logo, icons); the app itself is Rust.",
   "type": "module",
   "scripts": {
     "brand": "node branding/make-logo.mjs && node branding/export.mjs",

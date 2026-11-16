@@ -1,6 +1,6 @@
-; Inno Setup 6. Bauen: iscc /DAppVersion=1.1.0 installer\note-warden.iss  (nach `cargo build --release`)
-; Installation pro Benutzer, ohne Administratorrechte. Nutzerdaten liegen in
-; %LOCALAPPDATA%\Note Warden und werden bei der Deinstallation nie angefasst.
+; Inno Setup 6. Build: iscc /DAppVersion=1.1.0 installer\note-warden.iss  (after `cargo build --release`)
+; Per-user installation, without administrator rights. User data is stored in
+; %LOCALAPPDATA%\Note Warden and is never touched during uninstall.
 #ifndef AppVersion
   #define AppVersion "1.1.0"
 #endif

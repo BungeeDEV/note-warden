@@ -3,7 +3,7 @@ use gpui_kit::base::FocusTrapElement as _;
 use gpui_kit::component::text::TextView;
 
 impl NoteWarden {
-    /// Rechtes Seitenpanel (360 px): Liste der Stände, schreibgeschützte Vorschau, Wiederherstellen.
+    /// Right side panel (360 px): list of versions, read-only preview, restore.
     pub(super) fn history_panel_view(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let p = palette::get(cx);
         let panel = self.history_panel.as_ref().expect("Verlauf");

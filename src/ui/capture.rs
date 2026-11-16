@@ -184,6 +184,7 @@ impl NoteWarden {
                         && self
                             .project_filter
                             .is_none_or(|id| u.project_id == Some(id))
+                        && self.passes_tag_filter(u)
                 })
                 .collect();
             let mut column = div()
@@ -228,11 +229,10 @@ impl NoteWarden {
             for u in updates {
                 let id = u.id;
                 let entity = cx.entity();
-                let title: SharedString = if u.title.trim().is_empty() {
-                    "Ohne Titel".into()
-                } else {
-                    u.title.clone().into()
-                };
+                let title: SharedString = u
+                    .display_title()
+                    .unwrap_or_else(|| "Ohne Titel".into())
+                    .into();
                 let mut moves = div()
                     .flex()
                     .flex_wrap()

@@ -1,5 +1,5 @@
-// Erzeugt branding/logo.svg (Pixel-Schild, 32x32-Raster, Zelle = 32px bei 1024px Canvas)
-// und branding/logo-small.svg (Variante für Größen <= 32 px). Aufruf aus dem Projektstamm.
+// Generates branding/logo.svg (pixel shield, 32x32 grid, cell = 32px on a 1024px canvas)
+// and branding/logo-small.svg (variant for sizes <= 32 px). Run from the project root.
 import { writeFileSync, mkdirSync } from 'node:fs';
 const C = 32;
 const lerp = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
@@ -48,7 +48,7 @@ console.log('branding/logo.svg geschrieben');
 
 // --- Kleine Variante: gleiche Form, ohne Funken, zweite Notizzeile und Schlagschatten ---
 const row13 = lerp(top, bot, Math.round(((13 - 7) / 20) * 5) / 5);
-for (let x = 11; x <= 16; x++) set(x, 13, row13); // Notizzeile 2 zurück auf Schildfarbe
+for (let x = 11; x <= 16; x++) set(x, 13, row13); // note line 2 back to the shield color
 const small = out.slice(0, 5);
 const smallSorted = [...cells.entries()].map(([k, c]) => [...k.split(',').map(Number), c]).sort((a, b) => a[1] - b[1] || a[0] - b[0]);
 for (const [x, y, c] of smallSorted) small.push(`<rect x="${x*C}" y="${y*C}" width="${C + 0.5}" height="${C + 0.5}" fill="${hex(c)}"/>`);

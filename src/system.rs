@@ -1,7 +1,8 @@
 //! Windows-Integration: Ereigniskanal, Einzelinstanz, Hauptfenster, Tray, globaler Hotkey,
-//! Autostart und Benachrichtigungen. Alles lokal, keine Netzwerkzugriffe.
+//! autostart and notifications. Everything is local, no network access.
 use crate::reminders::Target;
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender, unbounded};
+use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use std::{
     cell::RefCell, os::windows::process::CommandExt, path::Path, process::Command, sync::OnceLock,
 };
@@ -16,14 +17,110 @@ use windows_sys::Win32::{
     },
 };
 
+fn native_handle(window: &gpui_kit::Window) -> Option<windows_sys::Win32::Foundation::HWND> {
+    match HasWindowHandle::window_handle(window).ok()?.as_raw() {
+        RawWindowHandle::Win32(handle) => Some(handle.hwnd.get() as _),
+        _ => None,
+    }
+}
+
+/// Plain handle value that can move into a foreground task.
+pub fn native_hwnd(window: &gpui_kit::Window) -> Option<isize> {
+    native_handle(window).map(|hwnd| hwnd as isize)
+}
+
+// The calls below resize the native window. GPUI misses the resulting `WM_SIZE` when it
+// arrives inside a window update, so they must run from a foreground task, never inline.
+
+/// Sticky-note chrome: no title bar and no maximize box, but resize frame, shadow, system
+/// menu and taskbar minimize stay. The client area becomes `w` x `h` logical pixels.
+pub fn enter_sticky(hwnd: isize, w: f32, h: f32, scale: f32) {
+    let hwnd = hwnd as windows_sys::Win32::Foundation::HWND;
+    set_frame_bars(hwnd, false);
+    resize_client(hwnd, w, h, scale);
+}
+
+fn set_frame_bars(hwnd: windows_sys::Win32::Foundation::HWND, visible: bool) {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        GWL_STYLE, GetWindowLongPtrW, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
+        SWP_NOZORDER, SetWindowLongPtrW, SetWindowPos, WS_CAPTION, WS_MAXIMIZEBOX,
+    };
+    const BARS: isize = (WS_CAPTION | WS_MAXIMIZEBOX) as isize;
+    unsafe {
+        let style = GetWindowLongPtrW(hwnd, GWL_STYLE);
+        let next = if visible { style | BARS } else { style & !BARS };
+        if next != style {
+            SetWindowLongPtrW(hwnd, GWL_STYLE, next);
+            SetWindowPos(
+                hwnd,
+                std::ptr::null_mut(),
+                0,
+                0,
+                0,
+                0,
+                SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE,
+            );
+        }
+    }
+}
+
+/// Sizes the window so its client area is `w` x `h` logical pixels under the current frame.
+fn resize_client(hwnd: windows_sys::Win32::Foundation::HWND, w: f32, h: f32, scale: f32) {
+    use windows_sys::Win32::{
+        Foundation::RECT,
+        UI::WindowsAndMessaging::{
+            AdjustWindowRectEx, GWL_EXSTYLE, GWL_STYLE, GetWindowLongPtrW, SWP_NOACTIVATE,
+            SWP_NOMOVE, SWP_NOZORDER, SetWindowPos,
+        },
+    };
+    unsafe {
+        let mut rect = RECT {
+            left: 0,
+            top: 0,
+            right: (w * scale).round() as i32,
+            bottom: (h * scale).round() as i32,
+        };
+        let style = GetWindowLongPtrW(hwnd, GWL_STYLE) as u32;
+        let ex_style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as u32;
+        AdjustWindowRectEx(&mut rect, style, 0, ex_style);
+        SetWindowPos(
+            hwnd,
+            std::ptr::null_mut(),
+            0,
+            0,
+            rect.right - rect.left,
+            rect.bottom - rect.top,
+            SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE,
+        );
+    }
+}
+
+pub fn pin_window(window: &gpui_kit::Window, pinned: bool) -> bool {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        HWND_NOTOPMOST, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SetWindowPos,
+    };
+    native_handle(window).is_some_and(|hwnd| unsafe {
+        SetWindowPos(
+            hwnd,
+            if pinned { HWND_TOPMOST } else { HWND_NOTOPMOST },
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+        ) != 0
+    })
+}
+
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 const APP_ID: &str = "NoteWarden.App";
 const WINDOW_TITLE: &str = "Note Warden";
 
-/// Ereignisse aus Tray, Hotkey, Benachrichtigungen und zweitem Programmstart.
+/// Events from the tray, hotkey, notifications and a second program start.
 pub enum Event {
     ShowWindow,
     QuickCapture,
+    Compact,
     Today,
     Quit,
     UpdaterChanged,
@@ -51,7 +148,7 @@ fn wide(text: &str) -> Vec<u16> {
     text.encode_utf16().chain(std::iter::once(0)).collect()
 }
 
-/// Öffnet Datei oder Ordner mit der Standard-App.
+/// Opens a file or folder with the default app.
 pub fn open_path(path: &Path) -> bool {
     Command::new("explorer")
         .arg(path)
@@ -60,7 +157,7 @@ pub fn open_path(path: &Path) -> bool {
         .is_ok()
 }
 
-/// Zeigt eine Datei markiert im Explorer.
+/// Shows a file selected in Explorer.
 pub fn reveal(path: &Path) -> bool {
     Command::new("explorer")
         .arg(format!("/select,{}", path.display()))
@@ -68,12 +165,20 @@ pub fn reveal(path: &Path) -> bool {
         .is_ok()
 }
 
-// ---------- Einzelinstanz und Hauptfenster ----------
+// ---------- Single instance and main window ----------
 
-/// `false`, wenn Note Warden schon läuft; dann wurde dessen Fenster nach vorn geholt.
+/// `false` if Note Warden is already running; its window was then brought to the front.
 pub fn claim_single_instance() -> bool {
-    let name = wide("Local\\NoteWarden.SingleInstance");
-    // Das Handle bleibt bis zum Prozessende offen.
+    let suffix = std::env::var_os("NOTE_WARDEN_DATA_DIR")
+        .map(|path| {
+            use std::hash::{Hash, Hasher};
+            let mut hash = std::collections::hash_map::DefaultHasher::new();
+            path.hash(&mut hash);
+            format!(".{:x}", hash.finish())
+        })
+        .unwrap_or_default();
+    let name = wide(&format!("Local\\NoteWarden.SingleInstance{suffix}"));
+    // The handle stays open until the process ends.
     let handle = unsafe { CreateMutexW(std::ptr::null(), 0, name.as_ptr()) };
     let exists = !handle.is_null() && unsafe { GetLastError() } == ERROR_ALREADY_EXISTS;
     if exists {
@@ -117,14 +222,15 @@ thread_local! {
     static HOTKEYS: RefCell<Option<(global_hotkey::GlobalHotKeyManager, Option<global_hotkey::hotkey::HotKey>)>> = const { RefCell::new(None) };
 }
 
-/// Legt das Tray-Symbol an (Hauptthread). Menü: Öffnen, Neues Update, Heute, Beenden.
+/// Creates the tray icon (main thread). Menu: open, new update, today, quit.
 pub fn create_tray() {
     use tray_icon::{
         Icon, MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent,
         menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem},
     };
     let open = MenuItem::with_id("open", "Öffnen", true, None);
-    let capture = MenuItem::with_id("capture", "Neues Update", true, None);
+    let capture = MenuItem::with_id("capture", "Schnell erfassen", true, None);
+    let compact = MenuItem::with_id("compact", "Notizzettel", true, None);
     let today = MenuItem::with_id("today", "Heute", true, None);
     let quit = MenuItem::with_id("quit", "Beenden", true, None);
     let menu = Menu::new();
@@ -132,6 +238,7 @@ pub fn create_tray() {
         .append_items(&[
             &open,
             &capture,
+            &compact,
             &today,
             &PredefinedMenuItem::separator(),
             &quit,
@@ -143,6 +250,7 @@ pub fn create_tray() {
     MenuEvent::set_event_handler(Some(|event: MenuEvent| match event.id.0.as_str() {
         "open" => send(Event::ShowWindow),
         "capture" => send(Event::QuickCapture),
+        "compact" => send(Event::Compact),
         "today" => send(Event::Today),
         "quit" => send(Event::Quit),
         _ => {}
@@ -177,7 +285,7 @@ pub enum HotkeyError {
     Taken,
 }
 
-/// "Strg+Alt+N" -> Hotkey. Erlaubt Strg/Alt/Umschalt/Win plus Buchstabe, Ziffer oder F-Taste.
+/// "Strg+Alt+N" -> hotkey. Allows Ctrl/Alt/Shift/Win plus a letter, digit or F key.
 fn parse_hotkey(text: &str) -> Option<global_hotkey::hotkey::HotKey> {
     let english: Vec<String> = text
         .split('+')
@@ -192,7 +300,7 @@ fn parse_hotkey(text: &str) -> Option<global_hotkey::hotkey::HotKey> {
     english.join("+").parse().ok()
 }
 
-/// Registriert den Hotkey neu; bei Fehler bleibt der bisherige aktiv.
+/// Registers the hotkey anew; on failure the previous one stays active.
 pub fn set_hotkey(text: &str) -> Result<(), HotkeyError> {
     use global_hotkey::{GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
     let hotkey = parse_hotkey(text).ok_or(HotkeyError::Invalid)?;
@@ -230,7 +338,7 @@ pub fn autostart_enabled() -> bool {
         .is_ok()
 }
 
-/// Beim Windows-Start minimiert im Tray starten.
+/// Start minimized in the tray when Windows starts.
 pub fn set_autostart(on: bool) -> std::io::Result<()> {
     let (key, _) =
         winreg::RegKey::predef(winreg::enums::HKEY_CURRENT_USER).create_subkey(RUN_KEY)?;
@@ -247,7 +355,7 @@ pub fn set_autostart(on: bool) -> std::io::Result<()> {
 
 // ---------- Benachrichtigungen ----------
 
-/// Meldet die App bei Windows an (Name und Symbol in Benachrichtigungen statt "PowerShell").
+/// Registers the app with Windows (name and icon in notifications instead of "PowerShell").
 pub fn register_app_id(data_dir: &Path) {
     unsafe { SetCurrentProcessExplicitAppUserModelID(wide(APP_ID).as_ptr()) };
     let icon = data_dir.join("app.ico");
@@ -266,7 +374,7 @@ pub fn register_app_id(data_dir: &Path) {
     }
 }
 
-/// Windows-Benachrichtigung; Klick und Schaltflächen kommen als `Event::Reminder` zurück.
+/// Windows notification; clicks and buttons come back as `Event::Reminder`.
 pub fn notify(title: &str, body: &str, target: Option<Target>) -> bool {
     use tauri_winrt_notification::{Duration, Toast};
     let mut toast = Toast::new(APP_ID)

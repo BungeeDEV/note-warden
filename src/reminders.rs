@@ -1,13 +1,13 @@
-//! Erinnerungen: reine Zeitlogik (testbar) und der zentrale Scheduler.
-//! Ein einziger Timer wartet auf den nächsten fälligen Zeitpunkt (in Schritten von höchstens 60 s,
-//! damit Standby und Zeitumstellung keine Fehlzeiten erzeugen); kein Dauer-Polling ohne Termine.
+//! Reminders: pure time logic (testable) and the central scheduler.
+//! A single timer waits for the next due time (in steps of at most 60 s,
+//! so that standby and clock changes do not cause missed times); no continuous polling without due dates.
 use crate::{
     model::{self, Remind},
     *,
 };
 use chrono::{Local, NaiveDateTime, Timelike};
 
-/// Worauf sich eine Erinnerung bezieht.
+/// What a reminder refers to.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Target {
     Update(u64),
@@ -41,7 +41,7 @@ pub enum ToastAction {
     Today,
 }
 
-/// Ruhige Zeiten in Minuten seit Mitternacht; `from > to` läuft über Mitternacht.
+/// Quiet hours in minutes since midnight; `from > to` wraps around midnight.
 #[derive(Clone, Copy)]
 pub struct Quiet {
     pub from: u32,
@@ -53,7 +53,7 @@ fn at_minute(date: NaiveDate, minute: u32) -> NaiveDateTime {
         .expect("gültige Uhrzeit")
 }
 
-/// Liegt `at` in den ruhigen Zeiten, rückt es auf deren Ende.
+/// If `at` falls into the quiet hours, it moves to their end.
 pub fn shift_out_of_quiet(at: NaiveDateTime, quiet: Option<Quiet>) -> NaiveDateTime {
     let Some(q) = quiet.filter(|q| q.from != q.to) else {
         return at;
@@ -74,7 +74,7 @@ pub fn shift_out_of_quiet(at: NaiveDateTime, quiet: Option<Quiet>) -> NaiveDateT
     }
 }
 
-/// Nächster Meldezeitpunkt aller noch nicht gemeldeten Erinnerungen (Schlummern zählt vor `remind_at`).
+/// Next notification time of all reminders not yet notified (a snooze counts before `remind_at`).
 pub fn next_fire(reminds: &[&Remind], quiet: Option<Quiet>) -> Option<NaiveDateTime> {
     reminds
         .iter()
@@ -100,7 +100,7 @@ impl NoteWarden {
         })
     }
 
-    /// Alle Erinnerungen offener Einträge (erledigte, archivierte und gelöschte entfallen).
+    /// All reminders of open entries (done, archived and deleted ones are omitted).
     pub fn all_reminds(&self) -> Vec<(Target, &Remind)> {
         let mut list = Vec::new();
         for u in self
@@ -167,7 +167,7 @@ impl NoteWarden {
             .unwrap_or_else(|| "Ohne Titel".into())
     }
 
-    /// Ein Satz zu Datum und Projekt für die Benachrichtigung.
+    /// One sentence about the date and project for the notification.
     fn target_context(&self, target: Target) -> String {
         let (project, date, parent) = match target {
             Target::Update(id) => self
@@ -247,7 +247,7 @@ impl NoteWarden {
         }
     }
 
-    /// Eigene Uhrzeit "hh:mm" aus dem Datums-Popover: am Fälligkeitstag, sonst heute (oder morgen, wenn vorbei).
+    /// Custom time "hh:mm" from the date popover: on the due day, otherwise today (or tomorrow if it has passed).
     pub fn apply_custom_remind(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(date_target) = self.date_pop.as_ref().map(|pop| pop.target) else {
             return;
@@ -280,7 +280,7 @@ impl NoteWarden {
         self.set_remind(target, Some(at), cx);
     }
 
-    /// Menschenlesbar für Tooltips: "Morgen, 9:00".
+    /// Human-readable for tooltips: "Morgen, 9:00".
     pub fn remind_label(&self, at: NaiveDateTime) -> String {
         let today = self.now_today();
         let day = if at.date() == today {
@@ -295,7 +295,7 @@ impl NoteWarden {
 
     // ---------- Scheduler ----------
 
-    /// Plant neu: ein Timer bis zum nächsten Ereignis. Ältere Timer enden über die Generationsnummer.
+    /// Reschedules: one timer until the next event. Older timers end through the generation number.
     pub fn schedule_reminders(&mut self, cx: &mut Context<Self>) {
         self.remind_gen += 1;
         let generation = self.remind_gen;
@@ -348,7 +348,7 @@ impl NoteWarden {
             .min()
     }
 
-    /// Meldet alles Fällige. Mehrere gleichzeitig fällige (Ruhezeit, Standby, App war aus) werden zu einer Meldung.
+    /// Reports everything that is due. Several that are due at the same time (quiet hours, standby, app was off) become one notification.
     fn process_reminders(&mut self, cx: &mut Context<Self>) {
         if !self.workspace.settings.reminders_on || !self.writable {
             return;
@@ -409,7 +409,7 @@ impl NoteWarden {
         cx.notify();
     }
 
-    /// "Heute fällig: 3 · Überfällig: 2"; `None`, wenn nichts zutrifft.
+    /// "Heute fällig: 3 · Überfällig: 2"; `None` if nothing applies.
     pub fn daily_summary(&self) -> Option<String> {
         let today = self.now_today();
         let (mut due, mut overdue) = (0, 0);
@@ -445,7 +445,7 @@ impl NoteWarden {
         (!parts.is_empty()).then(|| parts.join(" · "))
     }
 
-    /// Im Vordergrund als App-Toast, sonst als Windows-Benachrichtigung.
+    /// As an app toast in the foreground, otherwise as a Windows notification.
     pub fn notify(
         &mut self,
         title: &str,
@@ -529,7 +529,7 @@ impl NoteWarden {
         }
     }
 
-    /// Ereignisse aus Tray, Hotkey, Benachrichtigungen und zweitem Start.
+    /// Events from the tray, hotkey, notifications and a second start.
     pub fn handle_system_event(
         &mut self,
         event: crate::system::Event,
@@ -540,6 +540,13 @@ impl NoteWarden {
         match event {
             Event::ShowWindow => crate::system::show_main_window(),
             Event::QuickCapture => {
+                if let Some((handle, popup)) = self.popup_win.clone() {
+                    let _ = handle.update(cx, |_, window, cx| {
+                        window.activate_window();
+                        popup.update(cx, |popup, cx| popup.create_compact_note(window, cx));
+                    });
+                    return;
+                }
                 crate::system::show_main_window();
                 self.set_view(View::Today, cx);
                 self.focus_quick_add(window, cx);
@@ -548,6 +555,7 @@ impl NoteWarden {
                 crate::system::show_main_window();
                 self.show_today(window, cx);
             }
+            Event::Compact => self.open_popup(window, cx),
             Event::Quit => {
                 self.quitting = true;
                 cx.quit();
@@ -573,7 +581,7 @@ impl NoteWarden {
         }
     }
 
-    /// Erinnerungen von heute (auch bereits gemeldete) für die Startseite, nach Zeit sortiert.
+    /// Today's reminders (including ones already notified) for the start page, sorted by time.
     pub fn reminders_today(&self) -> Vec<(Target, NaiveDateTime)> {
         let today = self.now_today();
         let mut list: Vec<_> = self

@@ -1,5 +1,5 @@
-//! Pixel-Schild (gleiche Geometrie wie `branding/make-logo.mjs`), direkt als scharfe
-//! Quads gezeichnet: kein Anti-Aliasing, Zellgröße immer ganzzahlig.
+//! Pixel shield (same geometry as `branding/make-logo.mjs`), drawn directly as sharp
+//! quads: no anti-aliasing, cell size always an integer.
 
 use gpui_kit::*;
 
@@ -19,7 +19,7 @@ const EXT: &[(i32, i32, i32)] = &[
     (27, 15, 16),
 ];
 
-/// Schild belegt Zellen x 8..24, y 7..28 (16 × 21); der Schatten ragt eine Zelle darüber hinaus.
+/// The shield occupies cells x 8..24, y 7..28 (16 × 21); the shadow extends one cell beyond that.
 pub const COLS: i32 = 16;
 pub const ROWS: i32 = 21;
 const X0: i32 = 8;
@@ -115,18 +115,18 @@ fn cells(small: bool) -> Vec<Cell> {
         .collect()
 }
 
-/// Darstellung des Schilds.
+/// Presentation of the shield.
 #[derive(Clone, Copy)]
 pub struct LogoStyle {
-    /// Ganzzahlige Zellgröße in logischen Pixeln.
+    /// Integer cell size in logical pixels.
     pub cell: f32,
     /// Kleine Variante (ohne zweite Notizzeile, ohne Schatten).
     pub small: bool,
-    /// Harter Schatten eine Zelle nach unten rechts.
+    /// Hard shadow one cell to the bottom right.
     pub shadow: bool,
-    /// Skalierung des Hakens (1.0 = normal) für den Splash.
+    /// Scale of the check mark (1.0 = normal) for the splash.
     pub check_scale: f32,
-    /// Einfarbig (Leerzustände): Fläche gedämpft, Details voll.
+    /// Single color (empty states): surface muted, details full.
     pub mono: Option<Hsla>,
 }
 
@@ -165,7 +165,7 @@ fn to_hsla(c: Rgb) -> Hsla {
     rgb(((c[0] as u32) << 16) | ((c[1] as u32) << 8) | c[2] as u32).into()
 }
 
-/// Das Schild als Element mit fester, ganzzahliger Größe.
+/// The shield as an element with a fixed, integer size.
 pub fn shield(style: LogoStyle) -> impl IntoElement {
     let data = cells(style.small);
     div()
@@ -211,7 +211,7 @@ pub fn shield(style: LogoStyle) -> impl IntoElement {
                         let (mut x, mut y, mut w) =
                             ((c.x - X0) as f32 * s, (c.y - Y0) as f32 * s, s);
                         if c.check && (style.check_scale - 1.).abs() > f32::EPSILON {
-                            // Haken wächst um seine Mitte (Zelle 15,17 relativ zum Schild).
+                            // The check mark grows around its center (cell 15,17 relative to the shield).
                             let (cx, cy) = ((15 - X0) as f32 * s, (17 - Y0) as f32 * s);
                             x = cx + (x - cx) * style.check_scale;
                             y = cy + (y - cy) * style.check_scale;

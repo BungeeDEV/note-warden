@@ -1,15 +1,15 @@
-## Änderung
+## Change
 
-Was ändert sich für Nutzer, und warum?
+What changes for users, and why?
 
-## Prüfung
+## Verification
 
-- [ ] Passende Tests ergänzt oder bestehende Tests decken die Änderung ab.
-- [ ] `./scripts/check.ps1` erfolgreich (Format, Clippy, Rust-Tests, UI und Versionskonsistenz).
-- [ ] Bei UI-Änderungen: betroffene Ansichten und Tastaturbedienung manuell geprüft.
-- [ ] Bei Daten-/Updater-Änderungen: Migration, Backup und Fehlerpfade geprüft.
-- [ ] Nutzerrelevante Änderung unter `Unreleased` in `CHANGELOG.md` beschrieben.
+- [ ] Matching tests were added, or existing tests cover the change.
+- [ ] `./scripts/check.ps1` passes (format, Clippy, Rust tests, UI and version consistency).
+- [ ] For UI changes: the affected views and keyboard operation were checked manually.
+- [ ] For data or updater changes: migration, backup and failure paths were checked.
+- [ ] The user-relevant change is described under `Unreleased` in `CHANGELOG.md`.
 
-## Hinweise für das Review
+## Notes for the review
 
-Bekannte Einschränkungen, Screenshots bei UI-Änderungen oder besondere Prüfschritte.
+Known limitations, screenshots for UI changes or special verification steps.

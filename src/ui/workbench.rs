@@ -1,4 +1,4 @@
-//! Gemeinsamer Änderungsverlauf und Interaktion des Updates-Arbeitsbereichs.
+//! Shared change history and interaction of the updates workspace.
 use super::*;
 use gpui_kit::component::menu::{ContextMenuExt as _, DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::popover::{Popover, PopoverState};
@@ -124,7 +124,7 @@ impl NoteWarden {
         let Some(mut target) = target else {
             return;
         };
-        // Notiztext behält seinen eigenen Editor-Verlauf.
+        // The note text keeps its own editor history.
         for u in &mut target {
             if let Some(current) = self.workspace.update(u.id) {
                 u.notes = current.notes.clone();
@@ -226,6 +226,18 @@ impl NoteWarden {
                 })
             })
     }
+    /// Space in the update list: marks the selected update done, or reopens it.
+    pub fn toggle_selected_done(&mut self, cx: &mut Context<Self>) {
+        if let Some(update) = self.selected() {
+            let (id, next) = if update.status == Status::Erledigt {
+                (update.id, Status::Idee)
+            } else {
+                (update.id, Status::Erledigt)
+            };
+            self.set_status(id, next, cx);
+        }
+    }
+
     pub fn select_relative(&mut self, delta: isize, window: &mut Window, cx: &mut Context<Self>) {
         let ids: Vec<_> = self.visible_updates().into_iter().map(|u| u.id).collect();
         if ids.is_empty() {
@@ -264,6 +276,7 @@ impl NoteWarden {
                 self.detail_open = true;
                 self.title_input.update(cx, |i, cx| i.focus(window, cx));
             }
+            "space" => self.toggle_selected_done(cx),
             "1" | "2" | "3" | "4" => {
                 if let Some(id) = self.selected_update {
                     self.set_status(id, Status::ALL[key.parse::<usize>().unwrap() - 1], cx);
@@ -313,7 +326,7 @@ impl NoteWarden {
     }
 }
 
-/// Zähler für die Filterlisten im Popover (nur aktive, nicht gelöschte Updates).
+/// Counters for the filter lists in the popover (only active, non-deleted updates).
 struct ViewCounts {
     status: [usize; 4],
     priority: [usize; 4],
@@ -339,7 +352,7 @@ const DATE_LABELS: [&str; 5] = [
 
 type StateFn = Box<dyn Fn(&mut NoteWarden, &mut Context<NoteWarden>)>;
 
-/// Klick-Handler im Filter-Popover: ändert den Zustand und rendert das Popover neu.
+/// Click handler in the filter popover: changes the state and re-renders the popover.
 fn pop_click(
     app: &Entity<NoteWarden>,
     pop: &Entity<PopoverState>,
@@ -352,7 +365,7 @@ fn pop_click(
     }
 }
 
-/// Zeile mit Radio- oder Checkbox-Anzeige im Popover.
+/// Row with a radio or checkbox display in the popover.
 fn option_row(
     id: SharedString,
     p: &Palette,
@@ -475,6 +488,7 @@ impl NoteWarden {
             + ui.priorities.len()
             + usize::from(ui.date_filter > 0)
             + usize::from(self.project_filter.is_some())
+            + ui.tags.len()
     }
 
     fn view_customized(&self) -> bool {
@@ -487,6 +501,7 @@ impl NoteWarden {
         ui.statuses.clear();
         ui.priorities.clear();
         ui.date_filter = 0;
+        ui.tags.clear();
         ui.range_start = None;
         ui.range_end = None;
         self.project_filter = None;
@@ -502,7 +517,7 @@ impl NoteWarden {
         self.reset_filters(cx);
     }
 
-    /// Ein IconButton "Filter & Ansicht" mit Popover (Sortierung, Gruppierung, Anzeige, Filter).
+    /// One icon button "Filter & Ansicht" (filter & view) with a popover (sorting, grouping, display, filter).
     pub fn view_popover(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let p = palette::get(cx);
         let app = cx.entity();
@@ -886,7 +901,7 @@ impl NoteWarden {
         self.toast(format!("Ansicht {number} gespeichert"), None, cx);
     }
 
-    /// Einzeilige Reihe aktiver Filter unter der Suche; ohne aktive Filter gibt es sie nicht.
+    /// Single-line row of active filters under the search; without active filters it does not exist.
     pub fn filter_chips(&self, cx: &mut Context<Self>) -> Option<Div> {
         let p = palette::get(cx);
         let ui = &self.workspace.settings.updates_ui;
@@ -912,6 +927,19 @@ impl NoteWarden {
                         .retain(|x| *x != n);
                     a.persist(cx);
                     cx.notify();
+                }),
+            ));
+        }
+        for tag in ui.tags.clone() {
+            items.push((
+                format!("Tag: #{tag}"),
+                Box::new(move |a, cx| {
+                    a.workspace
+                        .settings
+                        .updates_ui
+                        .tags
+                        .retain(|t| t.to_lowercase() != tag.to_lowercase());
+                    a.save_updates_ui(cx);
                 }),
             ));
         }
@@ -1008,6 +1036,7 @@ impl NoteWarden {
         let ui = &mut self.workspace.settings.updates_ui;
         ui.statuses = state.statuses.clone();
         ui.priorities = state.priorities.clone();
+        ui.tags = state.tags.clone();
         ui.date_filter = state.date_filter;
         ui.range_start = state.range_start;
         ui.range_end = state.range_end;
@@ -1031,9 +1060,10 @@ impl NoteWarden {
             && ui.date_filter == state.date_filter
             && self.filter == state.filter
             && self.project_filter == state.project
+            && ui.tags == state.tags
     }
 
-    /// Gespeicherte Ansichten für die Sidebar-Gruppe "Ansichten".
+    /// Saved views for the "Ansichten" (views) sidebar group.
     pub fn saved_view_items(&self, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let p = palette::get(cx);
         self.workspace

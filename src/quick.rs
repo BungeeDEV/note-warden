@@ -1,4 +1,4 @@
-//! Reiner Quick-Add-Parser; Positionen sind UTF-8-Bytebereiche im Originaltext.
+//! Pure quick-add parser; positions are UTF-8 byte ranges in the original text.
 use crate::{dates, model::Project};
 use chrono::NaiveDate;
 use std::ops::Range;
@@ -11,6 +11,47 @@ pub struct Parsed {
     pub priority: u8,
     pub tokens: Vec<Range<usize>>,
 }
+/// Splits `#tag` words off a task line; the rest keeps its words in order.
+pub fn split_tags(line: &str) -> (String, Vec<String>) {
+    let mut tags = Vec::new();
+    let rest: Vec<&str> = line
+        .split_whitespace()
+        .filter(
+            |word| match word.strip_prefix('#').filter(|t| !t.is_empty()) {
+                Some(tag) => {
+                    crate::model::push_tag(&mut tags, tag);
+                    false
+                }
+                None => true,
+            },
+        )
+        .collect();
+    (rest.join(" "), tags)
+}
+
+/// Like `split_tags` for free text: line breaks and the spacing of the other words stay as they are.
+pub fn split_text_tags(text: &str) -> (String, Vec<String>) {
+    let mut tags = Vec::new();
+    let lines: Vec<String> = text
+        .split('\n')
+        .map(|line| {
+            line.split(' ')
+                .filter(
+                    |word| match word.strip_prefix('#').filter(|t| !t.is_empty()) {
+                        Some(tag) if !tag.contains(char::is_whitespace) => {
+                            crate::model::push_tag(&mut tags, tag);
+                            false
+                        }
+                        _ => true,
+                    },
+                )
+                .collect::<Vec<_>>()
+                .join(" ")
+        })
+        .collect();
+    (lines.join("\n").trim_end().to_owned(), tags)
+}
+
 pub fn parse_quick_input(text: &str, now: NaiveDate, projects: &[Project]) -> Parsed {
     let mut result = Parsed {
         title: String::new(),
@@ -92,7 +133,7 @@ pub fn parse_quick_input(text: &str, now: NaiveDate, projects: &[Project]) -> Pa
     result
 }
 
-/// Typ-Tokens ergänzen die bestehende Quick-Add-Syntax für Aufgaben.
+/// Type tokens extend the existing quick-add syntax for tasks.
 pub fn task_kind(text: &str) -> (crate::model::ChangeKind, String) {
     use crate::model::ChangeKind;
     let mut kind = ChangeKind::Added;
@@ -106,6 +147,27 @@ pub fn task_kind(text: &str) -> (crate::model::ChangeKind, String) {
         }
     }
     (kind, words.join(" "))
+}
+
+#[cfg(test)]
+mod tag_tests {
+    use super::*;
+
+    #[test]
+    fn split_text_tags_keeps_lines_and_indentation() {
+        let (text, tags) = split_text_tags("Milch #einkauf\n  - Brot  frisch\n#Einkauf #bio");
+        assert_eq!(text, "Milch\n  - Brot  frisch");
+        assert_eq!(tags, vec!["einkauf".to_owned(), "bio".to_owned()]);
+        assert_eq!(split_text_tags("#solo").0, "");
+    }
+
+    #[test]
+    fn split_tags_removes_tag_words_and_keeps_the_rest() {
+        let (title, tags) = split_tags("Fix #Bug login #api #bug  !2");
+        assert_eq!(title, "Fix login !2");
+        assert_eq!(tags, vec!["Bug".to_owned(), "api".to_owned()]);
+        assert_eq!(split_tags("# alone"), ("# alone".to_owned(), vec![]));
+    }
 }
 
 #[cfg(test)]

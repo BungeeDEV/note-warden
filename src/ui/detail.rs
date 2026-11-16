@@ -16,6 +16,9 @@ impl NoteWarden {
     }
 
     pub fn apply_edit(&mut self, edit: md::Edit, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.writable {
+            return;
+        }
         self.notes_input.update(cx, |ta, cx| {
             ta.set_selected_range(edit.range.clone(), cx);
             ta.replace(edit.text.clone(), window, cx);
@@ -33,6 +36,13 @@ impl NoteWarden {
     }
 
     fn effective_mode(&self, update: &model::Update) -> EditorMode {
+        if self.popup {
+            return if self.compact_preview {
+                EditorMode::Preview
+            } else {
+                EditorMode::Write
+            };
+        }
         let mode = self.workspace.settings.editor_mode;
         if update.status == Status::Erledigt
             && mode == EditorMode::Write
@@ -169,7 +179,11 @@ impl NoteWarden {
     }
 
     #[allow(clippy::let_and_return)]
-    fn editor(&self, update: &model::Update, cx: &mut Context<Self>) -> impl IntoElement {
+    pub(super) fn editor(
+        &self,
+        update: &model::Update,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
         let p = palette::get(cx);
         let mode = self.effective_mode(update);
         let writable = self.writable;
@@ -549,7 +563,11 @@ impl NoteWarden {
             })
     }
 
-    fn status_pill(&self, u: &model::Update, cx: &mut Context<Self>) -> impl IntoElement {
+    pub(super) fn status_pill(
+        &self,
+        u: &model::Update,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
         let p = palette::get(cx);
         let id = u.id;
         let status = u.status;
@@ -708,6 +726,9 @@ impl NoteWarden {
                             })
                             .when(done, |d| d.line_through())
                             .child(task.title.clone())
+                            .children(task.tags.iter().map(|tag| {
+                                div().ml(px(palette::SP_2)).child(tags::tag_pill(&p, tag))
+                            }))
                             .on_click(move |_, window, cx| {
                                 entity
                                     .update(cx, |app, cx| app.start_task_edit(task_id, window, cx))
@@ -1282,7 +1303,7 @@ impl NoteWarden {
                                         Textarea::new(&self.title_input)
                                             .appearance(false)
                                             .bordered(false)
-                                            .aria_label("Titel des Updates")
+                                            .aria_label("Titel")
                                             .text_size(palette::fs(palette::DETAIL_TITLE))
                                             .line_height(relative(1.2))
                                             .font_weight(FontWeight::SEMIBOLD)
@@ -1305,6 +1326,7 @@ impl NoteWarden {
                                     .child(self.project_chip(id, u.project_id, cx))
                                     .child(self.version_chip(u, cx)),
                             )
+                            .child(self.tags_row(u, cx))
                             .when(!times.is_empty(), |d| {
                                 d.child(
                                     div()
@@ -1451,7 +1473,7 @@ impl NoteWarden {
     }
 }
 
-/// Stabiler Zahlenschlüssel für Toolbar-Button-IDs.
+/// Stable numeric key for toolbar button IDs.
 fn icon_index(icon: IconName) -> usize {
     icon as usize
 }

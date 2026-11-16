@@ -1,6 +1,6 @@
-//! Auto-Updater. Aktiv nur, wenn beim Bauen Endpunkt und öffentlicher Signaturschlüssel gesetzt sind
-//! (`NOTE_WARDEN_UPDATE_URL`, `NOTE_WARDEN_UPDATE_PUBKEY`, siehe docs/releasing.md). Einzige Netzwerkanfrage der App.
-//! Der Installer wird erst nach erfolgreicher Signaturprüfung gestartet.
+//! Auto-updater. Active only if the endpoint and the public signing key were set at build time
+//! (`NOTE_WARDEN_UPDATE_URL`, `NOTE_WARDEN_UPDATE_PUBKEY`, see docs/releasing.md). The app's only network request.
+//! The installer is only started after the signature has been verified.
 use std::{
     io::Read,
     path::PathBuf,
@@ -38,7 +38,9 @@ pub enum State {
 pub type Shared = Arc<Mutex<State>>;
 
 pub fn configured() -> bool {
-    ENDPOINT.is_some_and(|endpoint| endpoint.starts_with("https://"))
+    // A portable copy must not be replaced by the installer; it is updated by hand.
+    !crate::storage::is_portable()
+        && ENDPOINT.is_some_and(|endpoint| endpoint.starts_with("https://"))
         && PUBLIC_KEY.is_some_and(|key| minisign_verify::PublicKey::from_base64(key.trim()).is_ok())
 }
 
@@ -110,7 +112,7 @@ fn verify_installer(bytes: &[u8], public_key: &str, signature: &str) -> Result<(
         .map_err(|_| "Signatur ungültig".to_owned())
 }
 
-/// Prüft im Hintergrund auf eine neuere Version.
+/// Checks in the background for a newer version.
 pub fn check(shared: &Shared) {
     if !configured() {
         return;
@@ -187,7 +189,7 @@ pub fn download(shared: &Shared, info: Info) {
     });
 }
 
-/// Startet den geprüften Installer; dessen expliziter Update-Modus startet die App neu.
+/// Starts the verified installer; its explicit update mode restarts the app.
 pub fn launch_installer(path: &std::path::Path) -> bool {
     let mut command = std::process::Command::new(path);
     command.args([

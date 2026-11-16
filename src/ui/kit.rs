@@ -1,5 +1,5 @@
-//! Wiederverwendbare UI-Grundlagen (siehe docs/ui-guidelines.md). Alle Maße und Farben
-//! kommen aus `palette`; Komponenten kennen keine eigenen Pixelwerte außerhalb der Skala.
+//! Reusable UI foundations (see docs/ui-guidelines.md). All sizes and colors
+//! come from `palette`; components know no pixel values of their own outside the scale.
 
 use super::*;
 use crate::palette::{self, Palette};
@@ -10,7 +10,7 @@ pub fn click_fn(f: impl Fn(&mut Window, &mut App) + 'static) -> ClickFn {
     std::rc::Rc::new(f)
 }
 
-/// Schalter 36 × 20, Knopf 16; `role=switch` über Beschriftung + Tastatur (Leertaste/Enter).
+/// Switch 36 × 20, knob 16; `role=switch` through label + keyboard (Space/Enter).
 pub fn switch(
     id: impl Into<ElementId>,
     p: &Palette,
@@ -46,8 +46,8 @@ pub fn switch(
         .on_click(move |_, w, cx| handler(w, cx))
 }
 
-/// Segment für Modi (Schreiben | Vorschau | Geteilt): kompakter Container, 28 px, Icons 14 px.
-/// Ohne `show_text` bleiben nur Icons mit Tooltip.
+/// Segment for modes (Schreiben | Vorschau | Geteilt, i.e. Write | Preview | Split): compact container, 28 px, icons 14 px.
+/// Without `show_text` only icons with a tooltip remain.
 pub fn segment(
     id: &'static str,
     p: &Palette,
@@ -95,8 +95,8 @@ pub fn segment(
         }))
 }
 
-/// Underline-Tabs für Seitenabschnitte: 36 px, 13/500, aktiver Reiter mit 2-px-Akzentlinie.
-/// Pfeiltasten, Pos1 und Ende wechseln den Reiter (APG).
+/// Underline tabs for page sections: 36 px, 13/500, active tab with a 2 px accent line.
+/// Arrow keys, Home and End switch the tab (APG).
 pub fn tabs(
     id: &'static str,
     p: &Palette,
@@ -181,7 +181,7 @@ pub fn tabs(
         }))
 }
 
-/// Eigenschaften-Chip (28 px, Pille): Icon + Wert; leer = transparent mit Rand und Platzhalter.
+/// Property chip (28 px, pill): icon + value; empty = transparent with a border and a placeholder.
 pub fn prop_chip(
     id: impl Into<ElementId>,
     p: &Palette,
@@ -213,7 +213,7 @@ pub fn prop_chip(
     }
 }
 
-/// Farbfeld (rund, 24 px); aktives Feld mit Ring.
+/// Color swatch (round, 24 px); the active one with a ring.
 pub fn swatch(
     id: impl Into<ElementId>,
     p: &Palette,
@@ -340,7 +340,7 @@ pub fn keycap(p: &Palette, text: impl Into<SharedString>) -> Div {
         .child(text.into())
 }
 
-/// Tastenkappen für ein Kürzel wie "Strg+Umschalt+K".
+/// Key caps for a shortcut such as "Strg+Umschalt+K".
 pub fn keycaps(p: &Palette, combo: &str) -> Div {
     div()
         .flex()
@@ -349,7 +349,7 @@ pub fn keycaps(p: &Palette, combo: &str) -> Div {
         .children(combo.split('+').map(|k| keycap(p, k.to_owned())))
 }
 
-/// Leerzustand mit Schild-Motiv, Titel, Satz und optionaler Primäraktion.
+/// Empty state with a shield motif, title, sentence and an optional primary action.
 pub fn empty_state(
     p: &Palette,
     title: &'static str,
@@ -376,7 +376,7 @@ pub fn empty_state(
         .when_some(action, |d, a| d.mt(px(palette::SP_2)).child(a))
 }
 
-/// Kleiner Fortschrittsring mit zugänglicher Textalternative.
+/// Small progress ring with an accessible text alternative.
 pub fn progress_ring(p: &Palette, done: usize, total: usize) -> Stateful<Div> {
     let p = *p;
     let ratio = if total == 0 {
@@ -427,7 +427,7 @@ pub fn progress_ring(p: &Palette, done: usize, total: usize) -> Stateful<Div> {
         )
 }
 
-/// Einziger Einstiegspunkt für Bibliotheks-Icons.
+/// The only entry point for library icons.
 pub fn icon(name: IconName, size: f32) -> Icon {
     debug_assert!(
         [
@@ -443,7 +443,7 @@ pub fn icon(name: IconName, size: f32) -> Icon {
     Icon::new(name).size(px(size))
 }
 
-/// Native Buttons liefern Tastatur, Fokus, Disabled und Loading aus GPUI.
+/// Native buttons provide keyboard, focus, disabled and loading from GPUI.
 pub fn button(id: impl Into<ElementId>) -> Button {
     Button::new(id)
         .with_size(gpui_kit::component::Size::Medium)
@@ -632,7 +632,7 @@ pub fn styleguide(state: &Entity<gpui_kit::component::input::InputState>) -> imp
     page
 }
 
-/// Kartenlink mit nachgestelltem Pfeil, ruhiger Typografie und fixer Höhe.
+/// Card link with a trailing arrow, calm typography and a fixed height.
 pub fn link_button(id: impl Into<ElementId>, p: &Palette, label: &'static str) -> Button {
     button(id)
         .ghost()
@@ -644,7 +644,7 @@ pub fn link_button(id: impl Into<ElementId>, p: &Palette, label: &'static str) -
         .child(icon(icons::FORWARD, palette::ICON_SM))
 }
 
-/// Statusformen sind auch ohne Farbwahrnehmung unterscheidbar.
+/// Status shapes are distinguishable even without color perception.
 pub fn status_icon(p: &Palette, status: Status, (done, total): (usize, usize)) -> Div {
     let color = p.status(status);
     div().size(px(palette::ICON_MD)).flex_none().child(
@@ -720,7 +720,7 @@ pub fn card_header(p: &Palette, title: &'static str, action: impl IntoElement) -
         .child(action)
 }
 
-/// Prioritätsbalken (16 px): Anzahl, Farbe und Tooltip-Wort tragen die Stufe gemeinsam.
+/// Priority bars (16 px): count, color and tooltip word together convey the level.
 pub fn priority_icon(id: impl Into<ElementId>, p: &Palette, priority: u8) -> Stateful<Div> {
     let level = priority.min(3) as usize;
     let on = match level {
@@ -796,7 +796,7 @@ pub fn meta_line(p: &Palette, parts: Vec<AnyElement>) -> Div {
     line
 }
 
-/// Gemeinsamer Leading-Slot aller Zeilen: Checkbox und Status-Icon stehen auf derselben Titel-Kante.
+/// Shared leading slot of all rows: checkbox and status icon sit on the same title edge.
 pub fn row_leading(child: impl IntoElement) -> Div {
     div()
         .size(px(palette::ROW_LEADING_SLOT))
@@ -807,8 +807,8 @@ pub fn row_leading(child: impl IntoElement) -> Div {
         .child(child)
 }
 
-/// Aktionen reservieren ihren Platz auch ohne Hover: Titel, Datum und Menüs überlappen nie.
-/// Sichtbar bei Zeilen-Hover, Fokus im Container oder expliziter Auswahl.
+/// Actions reserve their space even without hover: titles, dates and menus never overlap.
+/// Visible on row hover, focus inside the container or explicit selection.
 #[derive(IntoElement)]
 pub struct RowActions {
     id: ElementId,
@@ -860,8 +860,8 @@ impl RenderOnce for RowActions {
     }
 }
 
-/// Native Button für Navigation, Zeilen und mehrzeilige Kalenderzellen.
-/// Im Gegensatz zum beschrifteten Toolbar-Button bleibt das Child-Layout erhalten.
+/// Native button for navigation, rows and multi-line calendar cells.
+/// Unlike the labeled toolbar button, the child layout is preserved.
 pub fn surface(id: impl Into<ElementId>, p: &Palette) -> gpui_kit::base::Button {
     gpui_kit::base::Button::new(id)
         .cursor_pointer()

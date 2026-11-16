@@ -1,5 +1,6 @@
 mod calendar;
 mod capture;
+mod compact;
 mod detail;
 mod history;
 mod icons;
@@ -8,6 +9,8 @@ mod list;
 mod overlays;
 mod releases;
 mod settings;
+mod stickies;
+mod tags;
 mod today;
 pub mod workbench;
 
@@ -20,7 +23,7 @@ use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{Disableable as _, Icon, Sizable as _};
 use gpui_kit::prelude::FluentBuilder as _;
 
-/// Ziehbarer Eintrag im Kalender.
+/// Draggable entry in the calendar.
 #[derive(Clone)]
 pub enum CalItem {
     Update(u64, String),
@@ -35,7 +38,7 @@ impl CalItem {
     }
 }
 
-/// Aufgabe, die in der Liste umsortiert wird.
+/// Task that is being reordered in the list.
 #[derive(Clone)]
 pub struct TaskDrag {
     pub update_id: u64,
@@ -43,7 +46,7 @@ pub struct TaskDrag {
     pub label: String,
 }
 
-/// Update-Karte, die im Board auf eine Statusspalte gezogen wird.
+/// Update card that is dragged onto a status column in the board.
 #[derive(Clone)]
 pub struct UpdateDrag {
     pub id: u64,
@@ -111,13 +114,13 @@ pub fn text_secondary(p: &Palette, text: impl Into<SharedString>) -> Div {
         .child(text.into())
 }
 
-/// Text mit Markierung der Suchtreffer (Groß-/Kleinschreibung egal).
+/// Text with the search matches highlighted (case-insensitive).
 pub fn highlighted(text: &str, query: &str, p: &Palette) -> StyledText {
     let mut ranges = Vec::new();
     let query = query.trim().to_lowercase();
     if !query.is_empty() {
         let lower = text.to_lowercase();
-        // Nur wenn Längen übereinstimmen, bleiben die Byteoffsets gültig.
+        // The byte offsets only stay valid if the lengths match.
         if lower.len() == text.len() {
             let mut from = 0;
             while let Some(i) = lower[from..].find(&query) {
@@ -145,7 +148,7 @@ impl NoteWarden {
         model::today()
     }
 
-    /// Datums-Chip: "+ Datum" bzw. relativer Text. Öffnet das Datums-Popover.
+    /// Date chip: "+ Datum" or relative text. Opens the date popover.
     pub fn date_chip(
         &self,
         id: String,
@@ -197,7 +200,7 @@ impl NoteWarden {
         })
     }
 
-    /// Kleines Glockensymbol (nur Icon + Tooltip), wenn eine offene Erinnerung gesetzt ist.
+    /// Small bell symbol (icon + tooltip only) when an open reminder is set.
     pub fn remind_bell(&self, target: DateTarget, cx: &mut Context<Self>) -> Option<AnyElement> {
         let target = reminders::Target::from_date_target(target)?;
         let remind = self.remind_of(target)?;
@@ -305,7 +308,7 @@ impl NoteWarden {
             .on_click(move |_, window, cx| entity.update(cx, |app, cx| on_click(app, window, cx)))
     }
 
-    /// Eintrag der Gruppen „Status“, „Filter“ und der unteren Ablage.
+    /// Entry of the "Status" and "Filter" groups and of the bottom shelf.
     #[allow(clippy::too_many_arguments)]
     fn view_item(
         &self,
@@ -336,7 +339,7 @@ impl NoteWarden {
             })
             .when(active, |d| d.bg(p.bg_active))
             .when(!active, |d| d)
-            // Gleicher Leading-Slot wie in `nav_item`: Punkt und Icon sitzen auf derselben Mittellinie.
+            // Same leading slot as in `nav_item`: dot and icon sit on the same center line.
             .child(
                 div()
                     .size(px(palette::ICON_LG))
@@ -352,7 +355,7 @@ impl NoteWarden {
                     }),
             )
             .child(div().flex_1().child(label))
-            // Null wird nicht angezeigt; echte Zahlen in text-secondary, Überfälliges hervorgehoben.
+            // Zero is not shown; real numbers in text-secondary, overdue items highlighted.
             .when(count > 0, |d| {
                 d.child(
                     div()
@@ -502,24 +505,26 @@ impl NoteWarden {
                 |app, _, cx| app.set_view(View::Today, cx),
                 cx,
             ))
-            .child(
-                self.nav_item(
-                    "nav-inbox",
-                    icons::INBOX,
-                    "Inbox",
-                    None,
-                    self.workspace
-                        .standalone_tasks
-                        .iter()
-                        .filter(|t| !t.done)
-                        .count(),
-                    false,
-                    self.view == View::Inbox,
-                    icon_only,
-                    |app, _, cx| app.set_view(View::Inbox, cx),
-                    cx,
-                ),
-            )
+            .when(!self.workspace.settings.hide_inbox, |d| {
+                d.child(
+                    self.nav_item(
+                        "nav-inbox",
+                        icons::INBOX,
+                        "Inbox",
+                        None,
+                        self.workspace
+                            .standalone_tasks
+                            .iter()
+                            .filter(|t| !t.done)
+                            .count(),
+                        false,
+                        self.view == View::Inbox,
+                        icon_only,
+                        |app, _, cx| app.set_view(View::Inbox, cx),
+                        cx,
+                    ),
+                )
+            })
             .child(self.nav_item(
                 "nav-updates",
                 icons::UPDATES,
@@ -535,42 +540,62 @@ impl NoteWarden {
                 },
                 cx,
             ))
-            .child(self.nav_item(
-                "nav-board",
-                IconName::LayoutDashboard,
-                "Board",
-                Some("Strg+3"),
-                0,
-                false,
-                self.view == View::Board,
-                icon_only,
-                |app, _, cx| app.set_view(View::Board, cx),
-                cx,
-            ))
-            .child(self.nav_item(
-                "nav-releases",
-                icons::VERSION,
-                "Releases",
-                None,
-                0,
-                false,
-                self.view == View::Releases,
-                icon_only,
-                |app, _, cx| app.set_view(View::Releases, cx),
-                cx,
-            ))
-            .child(self.nav_item(
-                "nav-calendar",
-                icons::DATE,
-                "Kalender",
-                Some("Strg+4"),
-                0,
-                false,
-                self.view == View::Calendar,
-                icon_only,
-                |app, _, cx| app.set_view(View::Calendar, cx),
-                cx,
-            ))
+            .when(!self.workspace.settings.hide_board, |d| {
+                d.child(self.nav_item(
+                    "nav-board",
+                    IconName::LayoutDashboard,
+                    "Board",
+                    Some("Strg+3"),
+                    0,
+                    false,
+                    self.view == View::Board,
+                    icon_only,
+                    |app, _, cx| app.set_view(View::Board, cx),
+                    cx,
+                ))
+            })
+            .when(!self.workspace.settings.hide_stickies, |d| {
+                d.child(self.nav_item(
+                    "nav-stickies",
+                    IconName::StickyNote,
+                    "Post-its",
+                    None,
+                    0,
+                    false,
+                    self.view == View::Stickies,
+                    icon_only,
+                    |app, _, cx| app.set_view(View::Stickies, cx),
+                    cx,
+                ))
+            })
+            .when(!self.workspace.settings.hide_releases, |d| {
+                d.child(self.nav_item(
+                    "nav-releases",
+                    icons::VERSION,
+                    "Releases",
+                    None,
+                    0,
+                    false,
+                    self.view == View::Releases,
+                    icon_only,
+                    |app, _, cx| app.set_view(View::Releases, cx),
+                    cx,
+                ))
+            })
+            .when(!self.workspace.settings.hide_calendar, |d| {
+                d.child(self.nav_item(
+                    "nav-calendar",
+                    icons::DATE,
+                    "Kalender",
+                    Some("Strg+4"),
+                    0,
+                    false,
+                    self.view == View::Calendar,
+                    icon_only,
+                    |app, _, cx| app.set_view(View::Calendar, cx),
+                    cx,
+                ))
+            })
             .when(icon_only, |d| {
                 d.child(self.nav_item(
                     "nav-search",
@@ -649,6 +674,53 @@ impl NoteWarden {
                                                 Some(id)
                                             };
                                             app.save_updates_ui(cx);
+                                        })
+                                    })
+                            },
+                        ))
+                    })
+                })
+                .when(!self.workspace.all_tags().is_empty(), |d| {
+                    let open = self.workspace.settings.tags_group_open;
+                    let active_tags = &self.workspace.settings.updates_ui.tags;
+                    d.child(self.group_header(
+                        "grp-tags",
+                        "Tags",
+                        open,
+                        |s| s.tags_group_open = !s.tags_group_open,
+                        cx,
+                    ))
+                    .when(open, |d| {
+                        d.children(self.workspace.all_tags().into_iter().take(12).map(
+                            |(tag, count)| {
+                                let active = active_tags
+                                    .iter()
+                                    .any(|t| t.to_lowercase() == tag.to_lowercase());
+                                let entity = cx.entity();
+                                let clicked = tag.clone();
+                                kit::surface(SharedString::from(format!("sidebar-tag-{tag}")), &p)
+                                    .w_full()
+                                    .h(px(palette::CTL_MD))
+                                    .px(px(palette::CONTROL_PAD_SM))
+                                    .rounded(px(palette::R_INPUT))
+                                    .flex()
+                                    .items_center()
+                                    .justify_start()
+                                    .gap(px(palette::SP_2))
+                                    .text_size(palette::fs(palette::FS_BASE))
+                                    .font_weight(FontWeight::MEDIUM)
+                                    .text_color(if active {
+                                        p.text_primary
+                                    } else {
+                                        p.text_secondary
+                                    })
+                                    .when(active, |b| b.bg(p.bg_active))
+                                    .child(dot(palette::tag_color(&tag, &p)))
+                                    .child(div().flex_1().truncate().child(format!("#{tag}")))
+                                    .child(text_secondary(&p, count.to_string()))
+                                    .on_click(move |_, _, cx| {
+                                        entity.update(cx, |app, cx| {
+                                            app.toggle_tag_filter(&clicked, true, cx)
                                         })
                                     })
                             },
@@ -752,6 +824,19 @@ impl NoteWarden {
                     .items_center()
                     .when(icon_only, |d| d.flex_col().gap(px(4.)))
                     .when(!icon_only, |d| d.justify_between().px(px(4.)))
+                    .child(
+                        icon_btn(
+                            "open-compact",
+                            IconName::StickyNote,
+                            "Notizzettel öffnen · Strg+Umschalt+M",
+                        )
+                        .on_click({
+                            let entity = entity.clone();
+                            move |_, window, cx| {
+                                entity.update(cx, |app, cx| app.open_popup(window, cx))
+                            }
+                        }),
+                    )
                     .child(
                         icon_btn("open-settings", icons::SETTINGS, "Einstellungen · Strg+,")
                             .on_click({
@@ -873,7 +958,7 @@ impl NoteWarden {
                         ),
                     )
                     .child(
-                        // Restzeit bis zum automatischen Ausblenden; steht still bei Hover.
+                        // Remaining time until automatic hiding; stands still on hover.
                         div()
                             .absolute()
                             .left_0()
@@ -887,7 +972,7 @@ impl NoteWarden {
             }))
     }
 
-    /// Splash beim Start: Schild, Name, Version, Fortschrittslinie. Bleibt bei Ladefehlern stehen.
+    /// Splash on start: shield, name, version, progress line. Stays up on load errors.
     fn splash_overlay(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let p = palette::get(cx);
         let reduce = self.workspace.settings.motion == model::Motion::Reduced;
@@ -901,7 +986,7 @@ impl NoteWarden {
         let logo: AnyElement = if reduce {
             crate::logo::shield(style).into_any_element()
         } else {
-            // 0–220 ms Einblenden, 220–380 ms Haken „poppt“ (1.0 → 1.12 → 1.0).
+            // 0–220 ms fade in, 220–380 ms the check mark "pops" (1.0 → 1.12 → 1.0).
             crate::logo::shield(style)
                 .into_any_element()
                 .with_animation(
@@ -1021,7 +1106,7 @@ impl NoteWarden {
             )
     }
 
-    /// Ruhiger Speicherstatus: kurz "Speichert …", dann 2 s "Gespeichert", danach nur ein Check-Icon.
+    /// Calm save status: briefly "Speichert …" (saving), then 2 s "Gespeichert" (saved), afterwards just a check icon.
     pub fn save_status(&self, p: &Palette, cx: &mut Context<Self>) -> AnyElement {
         let row = || {
             div()
@@ -1112,7 +1197,7 @@ impl NoteWarden {
 }
 
 impl Render for NoteWarden {
-    /// Error-Boundary: ein Fehler beim Aufbau der Oberfläche zeigt den Fehlerbildschirm statt abzustürzen.
+    /// Error boundary: an error while building the interface shows the error screen instead of crashing.
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         if !self.crashed {
             let drawn = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -1205,7 +1290,8 @@ impl NoteWarden {
                 f32::from(size.width).round(),
                 f32::from(size.height).round(),
             );
-            if self.workspace.settings.window_size != Some(current)
+            if !self.popup
+                && self.workspace.settings.window_size != Some(current)
                 && self.splash != Splash::Showing
             {
                 self.workspace.settings.window_size = Some(current);
@@ -1232,47 +1318,53 @@ impl NoteWarden {
             context.add("Today");
         }
 
-        let main = match self.view {
-            View::Board => self.board_view(cx).into_any_element(),
-            View::Releases => self.releases_view(cx).into_any_element(),
-            View::Inbox => self.inbox_view(cx).into_any_element(),
-            View::Today => self
-                .today_view(f32::from(width) - sidebar_w, window, cx)
-                .into_any_element(),
-            View::Calendar => self.calendar_view(narrow, cx).into_any_element(),
-            View::Updates => {
-                let list_w = self.workspace.settings.list_width.clamp(300., 520.);
-                div()
-                    .flex_1()
-                    .min_w_0()
-                    .h_full()
-                    .flex()
-                    .when(!self.focus_mode && (!narrow || !self.detail_open), |d| {
-                        d.child(self.update_list(narrow, list_w, cx))
-                    })
-                    .when(!narrow && !self.focus_mode, |d| {
-                        let entity = cx.entity();
-                        d.child(
-                            div()
-                                .id("list-resize")
-                                .w(px(5.))
-                                .h_full()
-                                .flex_none()
-                                .cursor_col_resize()
-                                .hover(|s| s.bg(p.accent.opacity(0.35)))
-                                .when(self.resizing_list, |d| d.bg(p.accent.opacity(0.5)))
-                                .on_mouse_down(MouseButton::Left, move |_, _, cx| {
-                                    entity.update(cx, |app, cx| {
-                                        app.resizing_list = true;
-                                        cx.notify();
-                                    })
-                                }),
-                        )
-                    })
-                    .when(!narrow || self.detail_open, |d| {
-                        d.child(self.update_detail(narrow, cx))
-                    })
-                    .into_any_element()
+        let main = if self.popup {
+            self.remember_compact_bounds(window, cx);
+            self.compact_view(cx).into_any_element()
+        } else {
+            match self.view {
+                View::Board => self.board_view(cx).into_any_element(),
+                View::Releases => self.releases_view(cx).into_any_element(),
+                View::Stickies => self.stickies_view(cx).into_any_element(),
+                View::Inbox => self.inbox_view(cx).into_any_element(),
+                View::Today => self
+                    .today_view(f32::from(width) - sidebar_w, window, cx)
+                    .into_any_element(),
+                View::Calendar => self.calendar_view(narrow, cx).into_any_element(),
+                View::Updates => {
+                    let list_w = self.workspace.settings.list_width.clamp(300., 520.);
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .h_full()
+                        .flex()
+                        .when(!self.focus_mode && (!narrow || !self.detail_open), |d| {
+                            d.child(self.update_list(narrow, list_w, cx))
+                        })
+                        .when(!narrow && !self.focus_mode, |d| {
+                            let entity = cx.entity();
+                            d.child(
+                                div()
+                                    .id("list-resize")
+                                    .w(px(5.))
+                                    .h_full()
+                                    .flex_none()
+                                    .cursor_col_resize()
+                                    .hover(|s| s.bg(p.accent.opacity(0.35)))
+                                    .when(self.resizing_list, |d| d.bg(p.accent.opacity(0.5)))
+                                    .on_mouse_down(MouseButton::Left, move |_, _, cx| {
+                                        entity.update(cx, |app, cx| {
+                                            app.resizing_list = true;
+                                            cx.notify();
+                                        })
+                                    }),
+                            )
+                        })
+                        .when(!narrow || self.detail_open, |d| {
+                            d.child(self.update_detail(narrow, cx))
+                        })
+                        .into_any_element()
+                }
             }
         };
 
@@ -1304,6 +1396,11 @@ impl NoteWarden {
                 this.focus_mode = !this.focus_mode;
                 cx.notify();
             }))
+            .on_action(
+                cx.listener(|this, _: &ToggleCompactMode, window, cx| {
+                    this.toggle_popup(window, cx)
+                }),
+            )
             .on_action(cx.listener(|_this, _: &ToggleStyleguide, _, _cx| {
                 #[cfg(debug_assertions)]
                 {
@@ -1405,7 +1502,9 @@ impl NoteWarden {
                         .flex_1()
                         .min_h_0()
                         .flex()
-                        .when(!self.focus_mode, |d| d.child(self.sidebar(icon_only, cx)))
+                        .when(!self.focus_mode && !self.popup, |d| {
+                            d.child(self.sidebar(icon_only, cx))
+                        })
                         .child(
                             div()
                                 .flex_1()
