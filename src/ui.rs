@@ -7,6 +7,7 @@ mod icons;
 pub mod kit;
 mod list;
 mod overlays;
+mod projects;
 mod releases;
 mod settings;
 mod stickies;
@@ -631,54 +632,23 @@ impl NoteWarden {
                         )
                     }))
                 })
-                .when(self.workspace.projects.iter().any(|p| !p.archived), |d| {
-                    let open = self.workspace.settings.projects_group_open;
-                    d.child(self.group_header(
-                        "grp-projects",
-                        "Projekte",
-                        open,
-                        |s| s.projects_group_open = !s.projects_group_open,
-                        cx,
-                    ))
-                    .when(open, |d| {
-                        d.children(self.workspace.projects.iter().filter(|p| !p.archived).map(
-                            |project| {
-                                let id = project.id;
-                                let active = self.project_filter == Some(id);
-                                let entity = cx.entity();
-                                kit::surface(SharedString::from(format!("project-{id}")), &p)
-                                    .w_full()
-                                    .h(px(palette::CTL_MD))
-                                    .px(px(palette::CONTROL_PAD_SM))
-                                    .rounded(px(palette::R_INPUT))
-                                    .flex()
-                                    .items_center()
-                                    .justify_start()
-                                    .gap(px(palette::SP_2))
-                                    .text_size(palette::fs(palette::FS_BASE))
-                                    .font_weight(FontWeight::MEDIUM)
-                                    .text_color(if active {
-                                        p.text_primary
-                                    } else {
-                                        p.text_secondary
-                                    })
-                                    .when(active, |b| b.bg(p.bg_active))
-                                    .child(dot(palette::project_color(project, &p)))
-                                    .tooltip(tip(project.name.clone()))
-                                    .child(div().truncate().child(project.name.clone()))
-                                    .on_click(move |_, _, cx| {
-                                        entity.update(cx, |app, cx| {
-                                            app.project_filter = if app.project_filter == Some(id) {
-                                                None
-                                            } else {
-                                                Some(id)
-                                            };
-                                            app.save_updates_ui(cx);
-                                        })
-                                    })
-                            },
-                        ))
-                    })
+                .child(self.group_header(
+                    "grp-projects",
+                    "Projekte",
+                    self.workspace.settings.projects_group_open,
+                    |s| s.projects_group_open = !s.projects_group_open,
+                    cx,
+                ))
+                .when(self.workspace.settings.projects_group_open, |d| {
+                    d.children(
+                        self.workspace
+                            .projects
+                            .iter()
+                            .filter(|project| !project.archived)
+                            .map(|project| self.project_sidebar_row(project, cx))
+                            .collect::<Vec<_>>(),
+                    )
+                    .child(self.new_project_row(cx))
                 })
                 .when(!self.workspace.all_tags().is_empty(), |d| {
                     let open = self.workspace.settings.tags_group_open;

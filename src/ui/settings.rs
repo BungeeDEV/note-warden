@@ -779,53 +779,91 @@ impl NoteWarden {
                     &self.settings_target_focus,
                 );
                 sec.row(
-                    "Projekt anlegen",
-                    "Namen in der Inbox mit #Projekt eingeben und dort das Projekt anlegen.",
-                    action("projects-inbox", "Zur Inbox", |a, w, cx| {
-                        a.close_overlay(w, cx);
-                        a.set_view(View::Inbox, cx);
+                    "Neues Projekt",
+                    "Projekte gruppieren Updates und Inbox-Aufgaben. Sie lassen sich später umbenennen, einfärben, archivieren oder löschen.",
+                    action("projects-new", "Neues Projekt …", |a, w, cx| {
+                        a.open_project_dialog(None, None, w, cx)
                     }),
                 );
+                if self.workspace.projects.is_empty() {
+                    sec.row(
+                        "Noch keine Projekte",
+                        "Lege oben ein Projekt an oder wähle es direkt an einem Update unter „Projekt“.",
+                        div(),
+                    );
+                }
                 for project in &self.workspace.projects {
-                    if !matches_query(q, &project.name, "Projekt archivieren wiederherstellen") {
+                    if !matches_query(q, &project.name, "Projekt bearbeiten archivieren löschen") {
                         continue;
                     }
                     let id = project.id;
-                    let e = entity.clone();
+                    let edit = entity.clone();
+                    let archive = entity.clone();
+                    let delete = entity.clone();
+                    let archived = project.archived;
+                    let title = div()
+                        .flex()
+                        .items_center()
+                        .gap(px(palette::SP_2))
+                        .child(dot(palette::project_color(project, &p)))
+                        .child(project.name.clone());
                     sec.rows.push(
                         settings_row(
                             &p,
                             sec.rows.is_empty(),
-                            project.name.clone(),
+                            title,
                             Some(
-                                if project.archived {
-                                    "Archiviert"
-                                } else {
-                                    "Aktiv"
-                                }
+                                format!(
+                                    "{} · {}",
+                                    self.project_usage_text(id),
+                                    if archived { "Archiviert" } else { "Aktiv" }
+                                )
                                 .into(),
                             ),
-                            kit::button(("project-archive", id))
-                                .outline()
-                                .label(if project.archived {
-                                    "Wiederherstellen"
-                                } else {
-                                    "Archivieren"
-                                })
-                                .on_click(move |_, _, cx| {
-                                    e.update(cx, |a, cx| {
-                                        if !a.writable {
-                                            return;
-                                        }
-                                        if let Some(p) =
-                                            a.workspace.projects.iter_mut().find(|p| p.id == id)
-                                        {
-                                            p.archived = !p.archived;
-                                        }
-                                        a.persist(cx);
-                                        cx.notify();
-                                    })
-                                }),
+                            div()
+                                .flex()
+                                .items_center()
+                                .gap(px(palette::SP_2))
+                                .child(
+                                    kit::button(("project-edit", id))
+                                        .outline()
+                                        .with_size(gpui_kit::component::Size::Small)
+                                        .h(px(palette::CTL_SM))
+                                        .label("Bearbeiten")
+                                        .on_click(move |_, window, cx| {
+                                            edit.update(cx, |a, cx| {
+                                                a.open_project_dialog(Some(id), None, window, cx)
+                                            })
+                                        }),
+                                )
+                                .child(
+                                    kit::button(("project-archive", id))
+                                        .outline()
+                                        .with_size(gpui_kit::component::Size::Small)
+                                        .h(px(palette::CTL_SM))
+                                        .label(if archived {
+                                            "Wiederherstellen"
+                                        } else {
+                                            "Archivieren"
+                                        })
+                                        .on_click(move |_, _, cx| {
+                                            archive.update(cx, |a, cx| {
+                                                a.set_project_archived(id, !archived, cx)
+                                            })
+                                        }),
+                                )
+                                .child(
+                                    icon_btn(
+                                        ("project-delete", id),
+                                        icons::DELETE,
+                                        "Projekt löschen",
+                                    )
+                                    .on_click(
+                                        move |_, _, cx| {
+                                            delete.update(cx, |a, cx| a.delete_project(id, cx))
+                                        },
+                                    ),
+                                ),
                         )
                         .into_any_element(),
                     );

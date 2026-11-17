@@ -205,6 +205,8 @@ pub enum Dialog {
     ConfirmEmptyTrash,
     ConfirmWipe,
     Template,
+    /// Create (`None`) or edit a project.
+    Project(Option<u64>),
     /// Data was restored automatically from a backup (Unix ms).
     Recovered(i64),
     ConfirmRestore(i64),
@@ -295,6 +297,8 @@ pub enum Undo {
     Notes(u64, String),
     /// Deleted post-it including its position.
     Sticky(usize, model::Sticky),
+    /// Deleted project with the updates and tasks that were assigned to it.
+    Project(Box<model::RemovedProject>),
 }
 
 pub struct Toast {
@@ -360,6 +364,11 @@ pub struct PopupInit {
 pub struct NoteWarden {
     pub sticky_input: Entity<TextareaState>,
     pub tag_input: Entity<InputState>,
+    pub project_name_input: Entity<InputState>,
+    pub project_color: u32,
+    pub project_error: Option<&'static str>,
+    /// Update that receives the project created in the open dialog.
+    pub project_assign: Option<u64>,
     pub editing_sticky: Option<u64>,
     /// Only post-its with this tag are shown (not saved).
     pub sticky_tag: Option<String>,
@@ -849,7 +858,22 @@ impl NoteWarden {
                 }
             },
         );
+        let project_name_input =
+            cx.new(|cx| InputState::new(window, cx).placeholder("z. B. Webseite"));
+        let project_sub = cx.subscribe_in(
+            &project_name_input,
+            window,
+            |this, _, event: &InputEvent, window, cx| match event {
+                InputEvent::PressEnter { .. } => this.save_project(window, cx),
+                InputEvent::Change if this.project_error.take().is_some() => cx.notify(),
+                _ => {}
+            },
+        );
         let mut app = Self {
+            project_name_input,
+            project_color: palette::PROJECT_PALETTE[0],
+            project_error: None,
+            project_assign: None,
             tag_input,
             sticky_input,
             editing_sticky: None,
@@ -1028,6 +1052,7 @@ impl NoteWarden {
         }
         app._subscriptions.push(sticky_sub);
         app._subscriptions.push(tag_sub);
+        app._subscriptions.push(project_sub);
         app._subscriptions.push(version_sub);
         app._subscriptions.push(remind_sub);
         app.sort = app.workspace.settings.updates_ui.sort;
@@ -2167,6 +2192,7 @@ impl NoteWarden {
                     self.sync_fields(window, cx);
                 }
             }
+            Some(Undo::Project(removed)) => self.workspace.restore_project(*removed),
             Some(Undo::Sticky(index, sticky)) => {
                 let at = index.min(self.workspace.stickies.len());
                 self.workspace.stickies.insert(at, sticky);

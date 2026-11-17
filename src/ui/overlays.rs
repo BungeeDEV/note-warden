@@ -58,6 +58,8 @@ pub enum PaletteAction {
     Shortcuts,
     GoReleases,
     GoStickies,
+    NewProject,
+    ManageProjects,
     Publish,
     BackupNow,
     CheckUpdates,
@@ -108,6 +110,8 @@ impl NoteWarden {
             ),
             command("Gehe zu Releases", "", PaletteAction::GoReleases),
             command("Gehe zu Post-its", "", PaletteAction::GoStickies),
+            command("Neues Projekt …", "", PaletteAction::NewProject),
+            command("Projekte verwalten", "", PaletteAction::ManageProjects),
             command("Jetzt sichern", "Backup", PaletteAction::BackupNow),
             command("Nach Updates suchen", "", PaletteAction::CheckUpdates),
             command("Backup exportieren", "JSON", PaletteAction::ExportBackup),
@@ -179,6 +183,10 @@ impl NoteWarden {
             PaletteAction::Shortcuts => self.open_dialog(Dialog::Shortcuts, window, cx),
             PaletteAction::GoReleases => self.set_view(View::Releases, cx),
             PaletteAction::GoStickies => self.set_view(View::Stickies, cx),
+            PaletteAction::NewProject => self.open_project_dialog(None, None, window, cx),
+            PaletteAction::ManageProjects => {
+                self.open_settings(Some(SettingsCat::Projects), window, cx)
+            }
             PaletteAction::Publish => {
                 if let Some(id) = self.selected_update {
                     self.open_publish(id, window, cx);
@@ -873,6 +881,15 @@ impl NoteWarden {
         let p = palette::get(cx);
         let dialog = self.dialog.clone().expect("dialog");
         match dialog {
+            Dialog::Project(id) => {
+                let body = self.project_dialog_body(id, cx).into_any_element();
+                let title = if id.is_some() {
+                    "Projekt bearbeiten"
+                } else {
+                    "Neues Projekt"
+                };
+                self.dialog_frame(title, 460., body, cx).into_any_element()
+            }
             Dialog::Template => {
                 let body = self.template_dialog_body(cx).into_any_element();
                 self.dialog_frame("Vorlage bearbeiten", 520., body, cx)
