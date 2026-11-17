@@ -379,6 +379,16 @@ pub const PROJECT_PALETTE: [u32; 8] = [
     0x38bdf8, 0xa78bfa, 0xf472b6, 0xfb923c, 0x4ade80, 0x2dd4bf, 0xfacc15, 0xf87171,
 ];
 
+/// Names of `PROJECT_PALETTE`, in the same order (accessibility labels of the swatches).
+pub const PROJECT_COLOR_NAMES: [&str; 8] = [
+    "Blau", "Violett", "Pink", "Orange", "Grün", "Türkis", "Gelb", "Rot",
+];
+
+/// The plain color of a palette entry, for color swatches.
+pub fn swatch_color(hex: u32) -> Hsla {
+    c(hex)
+}
+
 /// Starting color for a new project: deterministic from the project ID.
 pub fn default_project_color(id: u64) -> u32 {
     PROJECT_PALETTE[(id % PROJECT_PALETTE.len() as u64) as usize]

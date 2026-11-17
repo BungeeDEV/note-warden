@@ -392,6 +392,7 @@ impl NoteWarden {
                 }
             };
             let create = e.clone();
+            let manage = e.clone();
             let menu = menu.item(
                 PopupMenuItem::new("Kein Projekt")
                     .checked(current.is_none())
@@ -408,25 +409,16 @@ impl NoteWarden {
                 })
                 .item(PopupMenuItem::separator())
                 .item(
-                    PopupMenuItem::new("Neues Projekt …").on_click(move |_, _, cx| {
+                    PopupMenuItem::new("Neues Projekt …").on_click(move |_, window, cx| {
                         create.update(cx, |a, cx| {
-                            if !a.writable {
-                                return;
-                            }
-                            let pid = a.workspace.alloc_id();
-                            a.workspace.projects.push(model::Project {
-                                id: pid,
-                                name: "Neues Projekt".into(),
-                                color: palette::default_project_color(pid),
-                                archived: false,
-                                created_at: model::now_millis(),
-                            });
-                            if let Some(u) = a.workspace.update_mut(id) {
-                                u.project_id = Some(pid);
-                                u.touch();
-                            }
-                            a.persist(cx);
-                            cx.notify();
+                            a.open_project_dialog(None, Some(id), window, cx)
+                        })
+                    }),
+                )
+                .item(
+                    PopupMenuItem::new("Projekte verwalten …").on_click(move |_, window, cx| {
+                        manage.update(cx, |a, cx| {
+                            a.open_settings(Some(SettingsCat::Projects), window, cx)
                         })
                     }),
                 )

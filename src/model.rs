@@ -624,6 +624,28 @@ pub struct Project {
     pub created_at: i64,
 }
 
+/// What deleting a project detached, so that the deletion can be undone.
+#[derive(Clone)]
+pub struct RemovedProject {
+    pub project: Project,
+    pub index: usize,
+    pub updates: Vec<u64>,
+    pub tasks: Vec<u64>,
+}
+
+/// Project name as stored: whitespace collapsed, at most 40 characters; `None` if empty.
+pub fn clean_project_name(raw: &str) -> Option<String> {
+    let name: String = raw
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .chars()
+        .take(40)
+        .collect();
+    let name = name.trim().to_owned();
+    (!name.is_empty()).then_some(name)
+}
+
 #[derive(Clone, Deserialize, Serialize)]
 pub struct StandaloneTask {
     pub id: u64,
@@ -675,6 +697,76 @@ fn first_id() -> u64 {
 }
 
 impl Workspace {
+    /// Is `name` (ignoring case) already used by another project than `except`?
+    pub fn project_name_taken(&self, name: &str, except: Option<u64>) -> bool {
+        let name = name.to_lowercase();
+        self.projects
+            .iter()
+            .any(|p| Some(p.id) != except && p.name.to_lowercase() == name)
+    }
+
+    /// Live updates and open inbox tasks that belong to the project.
+    pub fn project_usage(&self, id: u64) -> (usize, usize) {
+        let updates = self
+            .updates
+            .iter()
+            .filter(|u| u.is_live() && u.project_id == Some(id))
+            .count();
+        let tasks = self
+            .standalone_tasks
+            .iter()
+            .filter(|t| !t.done && t.project_id == Some(id))
+            .count();
+        (updates, tasks)
+    }
+
+    /// Deletes the project; its updates and tasks stay and merely lose the assignment.
+    pub fn remove_project(&mut self, id: u64) -> Option<RemovedProject> {
+        let index = self.projects.iter().position(|p| p.id == id)?;
+        let project = self.projects.remove(index);
+        let mut updates = Vec::new();
+        for update in self.updates.iter_mut().filter(|u| u.project_id == Some(id)) {
+            update.project_id = None;
+            updates.push(update.id);
+        }
+        let mut tasks = Vec::new();
+        for task in self
+            .standalone_tasks
+            .iter_mut()
+            .filter(|t| t.project_id == Some(id))
+        {
+            task.project_id = None;
+            tasks.push(task.id);
+        }
+        Some(RemovedProject {
+            project,
+            index,
+            updates,
+            tasks,
+        })
+    }
+
+    /// Undoes `remove_project`: the project returns to its place and takes its items back.
+    pub fn restore_project(&mut self, removed: RemovedProject) {
+        let id = removed.project.id;
+        let at = removed.index.min(self.projects.len());
+        self.projects.insert(at, removed.project);
+        for update in self
+            .updates
+            .iter_mut()
+            .filter(|u| removed.updates.contains(&u.id))
+        {
+            update.project_id = Some(id);
+        }
+        for task in self
+            .standalone_tasks
+            .iter_mut()
+            .filter(|t| removed.tasks.contains(&t.id))
+        {
+            task.project_id = Some(id);
+        }
+    }
+
     /// Every tag in use by a live update or its tasks with the number of updates using it,
     /// most used first. The spelling of the first occurrence wins.
     pub fn all_tags(&self) -> Vec<(String, usize)> {
@@ -988,6 +1080,42 @@ pub fn plural(count: usize, one: &str, many: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn deleting_a_project_keeps_its_items_and_can_be_undone() {
+        assert_eq!(
+            clean_project_name("  Mein   Projekt "),
+            Some("Mein Projekt".into())
+        );
+        assert_eq!(clean_project_name("   "), None);
+        assert_eq!(
+            clean_project_name(&"x".repeat(60)).map(|n| n.len()),
+            Some(40)
+        );
+        let mut ws = Workspace::default();
+        let id = ws.alloc_id();
+        let other = ws.alloc_id();
+        for (pid, name) in [(id, "Alpha"), (other, "Beta")] {
+            ws.projects.push(Project {
+                id: pid,
+                name: name.into(),
+                color: 0,
+                archived: false,
+                created_at: 0,
+            });
+        }
+        let update = ws.new_update(None);
+        ws.update_mut(update).unwrap().project_id = Some(id);
+        assert!(ws.project_name_taken("alpha", None));
+        assert!(!ws.project_name_taken("alpha", Some(id)));
+        assert_eq!(ws.project_usage(id), (1, 0));
+        let removed = ws.remove_project(id).unwrap();
+        assert_eq!(ws.projects.len(), 1);
+        assert_eq!(ws.update(update).unwrap().project_id, None);
+        ws.restore_project(removed);
+        assert_eq!(ws.projects[0].name, "Alpha");
+        assert_eq!(ws.update(update).unwrap().project_id, Some(id));
+        assert!(ws.remove_project(999).is_none());
+    }
 
     #[test]
     fn tags_are_cleaned_deduplicated_and_counted_across_updates_and_tasks() {
