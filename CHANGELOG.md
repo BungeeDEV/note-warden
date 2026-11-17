@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 1.2.1
+
 ### Added
 * Projekte verwalten: Anlegen, Umbenennen, Farbe ändern, Archivieren und Löschen. Ein Projekt öffnet einen Dialog mit Name und Farbpalette; erreichbar über den Abschnitt „Projekte“ in der Seitenleiste („+ Neues Projekt“ und „…“-Menü je Projekt), Einstellungen → Projekte, das Projekt-Menü eines Updates („Projekte verwalten …“) und die Befehlspalette. Gelöschte Projekte behalten ihre Updates und Aufgaben (sie verlieren nur die Zuordnung) und lassen sich per „Rückgängig“ samt Zuordnung wiederherstellen.
 * Einstellungen → Projekte zeigt je Projekt Farbe, Anzahl der Updates und offenen Aufgaben, Status und die Aktionen Bearbeiten, Archivieren/Wiederherstellen und Löschen.
