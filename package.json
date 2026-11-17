@@ -1,7 +1,7 @@
 {
   "name": "note-warden-branding",
   "private": true,
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Branding tools only (logo, icons); the app itself is Rust.",
   "type": "module",
   "scripts": {

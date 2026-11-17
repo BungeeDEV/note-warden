@@ -4,7 +4,7 @@
 [![CodeQL](https://github.com/BungeeDEV/note-warden/actions/workflows/codeql.yml/badge.svg)](https://github.com/BungeeDEV/note-warden/actions/workflows/codeql.yml)
 [![Release](https://img.shields.io/github/v/release/BungeeDEV/note-warden)](https://github.com/BungeeDEV/note-warden/releases/latest)
 
-Note Warden is a local Windows desktop app for planning updates. An update has a status, Markdown notes, tasks (with subtasks) and dates; updates and tasks can be scheduled individually. Version `1.2.0`, see [CHANGELOG.md](CHANGELOG.md) for changes.
+Note Warden is a local Windows desktop app for planning updates. An update has a status, Markdown notes, tasks (with subtasks) and dates; updates and tasks can be scheduled individually. Version `1.2.1`, see [CHANGELOG.md](CHANGELOG.md) for changes.
 
 The app's interface is currently in German. Interface labels are quoted in German in this document, with the English meaning in parentheses.
 
