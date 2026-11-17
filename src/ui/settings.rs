@@ -358,11 +358,22 @@ impl NoteWarden {
 
     pub fn toggle_autostart(&mut self, cx: &mut Context<Self>) {
         let on = !self.workspace.settings.autostart;
-        match crate::system::set_autostart(on) {
+        match crate::system::set_autostart(on, self.workspace.settings.autostart_sticky) {
             Ok(()) => self.update_settings(cx, |s| s.autostart = on),
             Err(error) => {
                 crate::log::error(&format!("Autostart nicht änderbar: {error}"));
                 self.toast("Autostart konnte nicht geändert werden", None, cx);
+            }
+        }
+    }
+
+    pub fn toggle_autostart_sticky(&mut self, cx: &mut Context<Self>) {
+        let sticky = !self.workspace.settings.autostart_sticky;
+        match crate::system::set_autostart(self.workspace.settings.autostart, sticky) {
+            Ok(()) => self.update_settings(cx, |s| s.autostart_sticky = sticky),
+            Err(error) => {
+                crate::log::error(&format!("Autostart nicht änderbar: {error}"));
+                self.toast("Startansicht konnte nicht geändert werden", None, cx);
             }
         }
     }
@@ -387,10 +398,11 @@ impl NoteWarden {
     }
 
     pub fn apply_system_defaults(&mut self, cx: &mut Context<Self>) {
-        let _ = crate::system::set_autostart(false);
+        let _ = crate::system::set_autostart(false, false);
         self.apply_hotkey("Strg+Alt+N", cx);
         self.update_settings(cx, |s| {
             s.autostart = false;
+            s.autostart_sticky = false;
             s.tray_on_close = true;
         });
     }
@@ -942,6 +954,33 @@ impl NoteWarden {
                         },
                     ),
                 );
+                out.push(sec.build());
+
+                let mut sec = Section::new(&p, q, "Notizzettel · Sticky Mode")
+                    .navigation(
+                        entity.clone(),
+                        cat,
+                        self.settings_jump.as_deref(),
+                        &self.settings_target_focus,
+                    )
+                    .reset(
+                        s.compact.hide_completed != d.compact.hide_completed
+                            || s.compact.compact_cards != d.compact.compact_cards
+                            || s.compact.start_view != d.compact.start_view,
+                        reset(|s, d| {
+                            s.compact.hide_completed = d.compact.hide_completed;
+                            s.compact.compact_cards = d.compact.compact_cards;
+                            s.compact.start_view = d.compact.start_view;
+                        }),
+                    );
+                sec.row("Erledigte Updates ausblenden", "Abgeschlossene Updates in der Sticky-Liste verbergen. In der Hauptliste bleiben sie erhalten.",
+                    sw("sw-sticky-hide-completed", s.compact.hide_completed, "Erledigte Updates ausblenden", |s| s.compact.hide_completed = !s.compact.hide_completed));
+                sec.row("Kartenansicht", "Mit Details zeigt Status, Termin und Release. Nur Titel spart Platz; weitere Angaben stehen im Tooltip.",
+                    seg("sticky-card-density", &["Mit Details", "Nur Titel"], usize::from(s.compact.compact_cards), |s, i| s.compact.compact_cards = i == 1));
+                sec.row("Sticky-Startansicht", "Übersicht oder zuletzt im Sticky Mode geöffnetes Update. Bei fehlenden oder ausgeblendeten Einträgen öffnet sich die Übersicht.",
+                    seg("sticky-start-view", &["Übersicht", "Zuletzt geöffnet"], usize::from(s.compact.start_view == crate::compact::StickyStartView::LastUpdate), |s, i| {
+                        s.compact.start_view = if i == 1 { crate::compact::StickyStartView::LastUpdate } else { crate::compact::StickyStartView::Overview };
+                    }));
                 out.push(sec.build());
 
                 let mut sec = Section::new(&p, q, "Bestätigungen")
@@ -2083,6 +2122,7 @@ impl NoteWarden {
                     )
                     .reset(
                         s.autostart != d.autostart
+                            || s.autostart_sticky != d.autostart_sticky
                             || s.tray_on_close != d.tray_on_close
                             || s.hotkey != d.hotkey,
                         {
@@ -2092,7 +2132,7 @@ impl NoteWarden {
                     );
                 sec.row(
                     "Beim Windows-Start starten",
-                    "Startet minimiert im Tray; das Fenster öffnet sich nicht von selbst.",
+                    "Startet Note Warden automatisch bei der Windows-Anmeldung.",
                     {
                         let e = entity.clone();
                         switch(
@@ -2105,6 +2145,18 @@ impl NoteWarden {
                     },
                 );
                 sec.row("Beim Schließen im Tray weiterlaufen", "Nötig, damit Erinnerungen ankommen. „Beenden“ im Tray-Menü beendet Note Warden wirklich.", sw("sw-tray", s.tray_on_close, "Beim Schließen im Tray weiterlaufen", |s| s.tray_on_close = !s.tray_on_close));
+                sec.row(
+                    "Nur Sticky Mode beim Windows-Start",
+                    "Öffnet beim Autostart nur den Notizzettel. Das Hauptfenster bleibt verborgen. Ausgeschaltet: Start im Tray.",
+                    {
+                        let e = entity.clone();
+                        switch(
+                            "sw-autostart-sticky", &p, s.autostart_sticky,
+                            "Nur Sticky Mode beim Windows-Start",
+                            click_fn(move |_, cx| e.update(cx, |a, cx| a.toggle_autostart_sticky(cx))),
+                        )
+                    },
+                );
                 let capture = self.hotkey_capture;
                 let shown = if capture {
                     "Taste drücken …".to_owned()

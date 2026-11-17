@@ -188,6 +188,7 @@ impl NoteWarden {
         let mode = self.effective_mode(update);
         let writable = self.writable;
         let words = md::word_count(&update.notes);
+        let height = update.notes_height;
         let write = div()
             .id("notes-editor")
             .key_context("Editor")
@@ -253,7 +254,11 @@ impl NoteWarden {
                 div()
                     .flex()
                     .flex_col()
-                    .min_h(px(200.))
+                    .min_h(px(if height == 0 {
+                        72.
+                    } else {
+                        f32::from(height.clamp(72, 480))
+                    }))
                     .rounded(px(palette::R_CARD))
                     .border_1()
                     .border_color(if self.notes_focused {
@@ -272,6 +277,7 @@ impl NoteWarden {
                     })
                     .child(
                         div()
+                            .flex_1()
                             .when(
                                 self.workspace.settings.editor_font == model::EditorFont::Mono,
                                 |d| d.font_family(palette::FONT_MONO),
@@ -319,8 +325,8 @@ impl NoteWarden {
                         )
                     }),
             );
-        let preview = self.preview(&update.notes, cx);
-        match mode {
+        let preview = self.preview(&update.notes, cx).into_any_element();
+        let body = match mode {
             EditorMode::Write => write.into_any_element(),
             EditorMode::Preview => div().flex_1().min_w_0().child(preview).into_any_element(),
             EditorMode::Split => div()
@@ -338,7 +344,72 @@ impl NoteWarden {
                         .child(preview),
                 )
                 .into_any_element(),
-        }
+        };
+        div()
+            .min_w_0()
+            .flex()
+            .flex_col()
+            .gap(px(palette::SP_2))
+            .when(self.popup, |d| {
+                d.child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .justify_between()
+                        .child(text_secondary(&p, "Notizen"))
+                        .child(self.notes_height_control(update, cx)),
+                )
+            })
+            .child(body)
+    }
+
+    fn notes_height_control(
+        &self,
+        update: &model::Update,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
+        let id = update.id;
+        let height = update.notes_height;
+        let resize = cx.entity();
+        kit::button("notes-height")
+            .ghost()
+            .with_size(gpui_kit::component::Size::Small)
+            .label(match height {
+                0 => "Automatisch",
+                120 => "Kompakt",
+                320 => "Groß",
+                _ => "Normal",
+            })
+            .icon(kit::icon(icons::EXPAND, palette::ICON_SM))
+            .tooltip("Mindesthöhe der Notizen für dieses Update")
+            .accessibility_label("Höhe des Notizfelds einstellen")
+            .disabled(!self.writable)
+            .dropdown_menu(move |menu, _, _| {
+                [
+                    (0, "Automatisch · passend zum Inhalt"),
+                    (120, "Kompakt · 120 px"),
+                    (200, "Normal · 200 px"),
+                    (320, "Groß · 320 px"),
+                ]
+                .into_iter()
+                .fold(menu, |menu, (value, label)| {
+                    let e = resize.clone();
+                    menu.item(PopupMenuItem::new(label).checked(height == value).on_click(
+                        move |_, _, cx| {
+                            e.update(cx, |app, cx| {
+                                if !app.writable {
+                                    return;
+                                }
+                                if let Some(u) = app.workspace.update_mut(id) {
+                                    u.notes_height = value;
+                                }
+                                app.persist(cx);
+                                cx.notify();
+                            })
+                        },
+                    ))
+                })
+            })
     }
 
     fn project_chip(
@@ -425,7 +496,12 @@ impl NoteWarden {
         })
     }
 
-    fn priority_chip(&self, id: u64, current: u8, cx: &mut Context<Self>) -> impl IntoElement {
+    pub(super) fn priority_chip(
+        &self,
+        id: u64,
+        current: u8,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
         let p = palette::get(cx);
         let e = cx.entity();
         let labels = ["Keine", "Niedrig", "Mittel", "Hoch"];
@@ -470,7 +546,11 @@ impl NoteWarden {
         })
     }
 
-    fn date_prop_chip(&self, u: &model::Update, cx: &mut Context<Self>) -> impl IntoElement {
+    pub(super) fn date_prop_chip(
+        &self,
+        u: &model::Update,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
         let p = palette::get(cx);
         let today = self.now_today();
         let format = self.workspace.settings.date_format;
@@ -507,7 +587,11 @@ impl NoteWarden {
             })
     }
 
-    fn version_chip(&self, u: &model::Update, cx: &mut Context<Self>) -> impl IntoElement {
+    pub(super) fn version_chip(
+        &self,
+        u: &model::Update,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
         let p = palette::get(cx);
         let filled = !u.version.trim().is_empty();
         let lead = kit::icon(icons::VERSION, palette::ICON_SM).text_color(if filled {
@@ -603,7 +687,10 @@ impl NoteWarden {
         update_date: Option<NaiveDate>,
         task: &model::Task,
         cx: &mut Context<Self>,
-    ) -> impl IntoElement {
+    ) -> AnyElement {
+        if self.popup {
+            return self.compact_task_row(update_id, task, cx);
+        }
         let p = palette::get(cx);
         let task_id = task.id;
         let editing = self.editing_task == Some(task_id);
@@ -630,7 +717,7 @@ impl NoteWarden {
             .group(group_name.clone())
             .key_context("TaskRow")
             .focusable()
-            .when(sub, |d| d.ml(px(28.)))
+            .when(sub, |d| d.ml(px(palette::SP_6)))
             .rounded(px(palette::R_INPUT))
             .border_t_2()
             .border_color(gpui_kit::transparent_black())
@@ -668,11 +755,11 @@ impl NoteWarden {
             }))
             .child(
                 div()
-                    .min_h(px(34.))
-                    .px(px(4.))
+                    .min_h(px(palette::CTL_LG))
+                    .px(px(palette::SP_1))
                     .flex()
                     .items_center()
-                    .gap(px(8.))
+                    .gap(px(palette::SP_2))
                     .relative()
                     .rounded(px(palette::R_INPUT))
                     .hover(|s| s.bg(p.bg_hover))
@@ -687,11 +774,15 @@ impl NoteWarden {
                     )
                     .child({
                         let entity = entity.clone();
-                        kit::row_leading(kit::task_checkbox(("check", task_id), &p, done).on_click(
-                            move |_, _, cx| {
-                                entity.update(cx, |app, cx| app.toggle_task(update_id, task_id, cx))
-                            },
-                        ))
+                        kit::row_leading(
+                            kit::task_checkbox(("check", task_id), &p, done)
+                                .disabled(!self.writable)
+                                .on_click(move |_, _, cx| {
+                                    entity.update(cx, |app, cx| {
+                                        app.toggle_task(update_id, task_id, cx)
+                                    })
+                                }),
+                        )
                     })
                     .child(if editing {
                         div()
@@ -717,7 +808,13 @@ impl NoteWarden {
                                 p.text_primary
                             })
                             .when(done, |d| d.line_through())
-                            .child(task.title.clone())
+                            .child(
+                                div()
+                                    .w_full()
+                                    .min_w_0()
+                                    .whitespace_normal()
+                                    .child(task.title.clone()),
+                            )
                             .children(task.tags.iter().map(|tag| {
                                 div().ml(px(palette::SP_2)).child(tags::tag_pill(&p, tag))
                             }))
@@ -843,9 +940,237 @@ impl NoteWarden {
                     ),
                 )
             })
+            .into_any_element()
     }
 
-    fn task_section(&self, update: &model::Update, cx: &mut Context<Self>) -> impl IntoElement {
+    fn compact_task_row(&self, uid: u64, task: &model::Task, cx: &mut Context<Self>) -> AnyElement {
+        let p = palette::get(cx);
+        let tid = task.id;
+        let done = task.done;
+        let drag = TaskDrag {
+            update_id: uid,
+            task_id: tid,
+            label: task.title.clone(),
+        };
+        let toggle = cx.entity();
+        let edit = cx.entity();
+        let remove = cx.entity();
+        let menu = cx.entity();
+        div()
+            .id(("compact-task", tid))
+            .key_context("TaskRow")
+            .focusable()
+            .min_w_0()
+            .rounded(px(palette::R_INPUT))
+            .bg(p.bg_panel)
+            .p(px(palette::SP_1))
+            .border_t_2()
+            .border_color(gpui_kit::transparent_black())
+            .focus_visible(|s| s.border_color(p.accent))
+            .when(task.sub, |d| d.ml(px(palette::SP_4)))
+            .hover(|s| s.bg(p.bg_hover))
+            .when(self.writable, |d| {
+                d.drag_over::<TaskDrag>(move |s, _, _, _| s.border_color(p.accent))
+                    .on_drop(cx.listener(move |app, d: &TaskDrag, _, cx| {
+                        if d.update_id == uid {
+                            app.move_task(uid, d.task_id, Some(tid), cx);
+                        }
+                    }))
+            })
+            .on_action(
+                cx.listener(move |app, _: &TaskMoveUp, _, cx| app.nudge_task(uid, tid, true, cx)),
+            )
+            .on_action(
+                cx.listener(move |app, _: &TaskMoveDown, _, cx| {
+                    app.nudge_task(uid, tid, false, cx)
+                }),
+            )
+            .on_action(
+                cx.listener(move |app, _: &TaskToggleKey, _, cx| app.toggle_task(uid, tid, cx)),
+            )
+            .on_action(
+                cx.listener(move |app, _: &TaskEditKey, w, cx| app.start_task_edit(tid, w, cx)),
+            )
+            .on_action(
+                cx.listener(move |app, _: &TaskDeleteKey, _, cx| app.delete_task(uid, tid, cx)),
+            )
+            .on_action(
+                cx.listener(move |app, _: &TaskIndent, _, cx| app.indent_task(uid, tid, true, cx)),
+            )
+            .on_action(
+                cx.listener(move |app, _: &TaskOutdent, _, cx| {
+                    app.indent_task(uid, tid, false, cx)
+                }),
+            )
+            .child(
+                div()
+                    .flex()
+                    .items_start()
+                    .min_w_0()
+                    .gap(px(palette::SP_1))
+                    .child(
+                        div()
+                            .id(("compact-task-grip", tid))
+                            .flex_none()
+                            .w(px(palette::ICON_MD))
+                            .h(px(palette::CTL_MD))
+                            .flex()
+                            .items_center()
+                            .cursor_grab()
+                            .child(
+                                kit::icon(icons::DRAG, palette::ICON_SM)
+                                    .text_color(p.text_tertiary),
+                            )
+                            .when(self.writable, |d| {
+                                d.on_drag(drag, |d, _, _, cx| {
+                                    let label = d.label.clone();
+                                    cx.new(|_| DragPreview { label })
+                                })
+                            }),
+                    )
+                    .child(
+                        kit::task_checkbox(("compact-check", tid), &p, done)
+                            .h(px(palette::CTL_MD))
+                            .disabled(!self.writable)
+                            .on_click(move |_, _, cx| {
+                                toggle.update(cx, |app, cx| app.toggle_task(uid, tid, cx))
+                            }),
+                    )
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .child(if self.editing_task == Some(tid) {
+                                kit::input(&self.task_edit_input)
+                                    .aria_label("Aufgabe bearbeiten")
+                                    .w_full()
+                                    .into_any_element()
+                            } else {
+                                kit::surface(("compact-task-title", tid), &p)
+                                    .w_full()
+                                    .min_w_0()
+                                    .min_h(px(palette::CTL_MD))
+                                    .py(px(palette::SP_2))
+                                    .justify_start()
+                                    .text_left()
+                                    .when(done, |b| b.line_through().text_color(p.text_tertiary))
+                                    .child(
+                                        div()
+                                            .w_full()
+                                            .min_w_0()
+                                            .whitespace_normal()
+                                            .child(task.title.clone()),
+                                    )
+                                    .disabled(!self.writable)
+                                    .on_click(move |_, w, cx| {
+                                        edit.update(cx, |app, cx| app.start_task_edit(tid, w, cx))
+                                    })
+                                    .into_any_element()
+                            }),
+                    )
+                    .when(task.priority > 0, |d| {
+                        d.child(kit::priority_icon(
+                            ("compact-task-priority", tid),
+                            &p,
+                            task.priority,
+                        ))
+                    })
+                    .child(
+                        icon_btn(
+                            ("compact-task-more", tid),
+                            icons::MORE,
+                            "Aufgabe verschieben oder planen",
+                        )
+                        .disabled(!self.writable)
+                        .dropdown_menu(move |m, _, _| {
+                            let up = menu.clone();
+                            let down = menu.clone();
+                            let date = menu.clone();
+                            m.item(
+                                PopupMenuItem::new("Nach oben verschieben · Alt+↑").on_click(
+                                    move |_, _, cx| {
+                                        up.update(cx, |a, cx| a.nudge_task(uid, tid, true, cx))
+                                    },
+                                ),
+                            )
+                            .item(
+                                PopupMenuItem::new("Nach unten verschieben · Alt+↓").on_click(
+                                    move |_, _, cx| {
+                                        down.update(cx, |a, cx| a.nudge_task(uid, tid, false, cx))
+                                    },
+                                ),
+                            )
+                            .item(
+                                PopupMenuItem::new("Termin & Erinnerung …").on_click(
+                                    move |_, w, cx| {
+                                        date.update(cx, |a, cx| {
+                                            a.open_date_pop(
+                                                DateTarget::Task(uid, tid),
+                                                w.mouse_position(),
+                                                w,
+                                                cx,
+                                            )
+                                        })
+                                    },
+                                ),
+                            )
+                        }),
+                    )
+                    .child(
+                        icon_btn(
+                            ("compact-task-delete", tid),
+                            icons::DELETE,
+                            "Aufgabe löschen",
+                        )
+                        .disabled(!self.writable)
+                        .on_click(move |_, _, cx| {
+                            remove.update(cx, |app, cx| app.delete_task(uid, tid, cx))
+                        }),
+                    ),
+            )
+            .when(
+                task.planned_for.is_some()
+                    || !task.tags.is_empty()
+                    || !task.description.trim().is_empty(),
+                |d| {
+                    d.child(
+                        div()
+                            .pl(px(palette::ICON_MD
+                                + palette::ROW_LEADING_SLOT
+                                + palette::SP_2))
+                            .pb(px(palette::SP_2))
+                            .flex()
+                            .flex_wrap()
+                            .items_center()
+                            .gap(px(palette::SP_1))
+                            .when(task.planned_for.is_some(), |d| {
+                                d.child(self.date_chip(
+                                    format!("compact-task-date-{tid}"),
+                                    DateTarget::Task(uid, tid),
+                                    task.planned_for,
+                                    done,
+                                    cx,
+                                ))
+                            })
+                            .children(task.tags.iter().map(|t| tags::tag_pill(&p, t)))
+                            .when(!task.description.trim().is_empty(), |d| {
+                                d.child(
+                                    div()
+                                        .w_full()
+                                        .child(text_secondary(&p, task.description.clone())),
+                                )
+                            }),
+                    )
+                },
+            )
+            .into_any_element()
+    }
+
+    pub(super) fn task_section(
+        &self,
+        update: &model::Update,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
         let p = palette::get(cx);
         let id = update.id;
         let (done, total) = update.task_progress();
@@ -884,7 +1209,11 @@ impl NoteWarden {
                                     .text_size(palette::fs(palette::FS_MD))
                                     .font_weight(FontWeight::SEMIBOLD)
                                     .text_color(p.text_primary)
-                                    .child("Aufgaben & Features"),
+                                    .child(if self.popup {
+                                        "Aufgaben"
+                                    } else {
+                                        "Aufgaben & Features"
+                                    }),
                             )
                             .child(
                                 div()
@@ -1358,12 +1687,18 @@ impl NoteWarden {
                                                 .child(kit::card_header(
                                                     &p,
                                                     "Notizen",
-                                                    self.mode_switch(
-                                                        mode,
-                                                        id,
-                                                        narrow || detail_w >= 720.,
-                                                        cx,
-                                                    ),
+                                                    div()
+                                                        .flex()
+                                                        .flex_wrap()
+                                                        .items_center()
+                                                        .gap(px(palette::SP_2))
+                                                        .child(self.mode_switch(
+                                                            mode,
+                                                            id,
+                                                            narrow || detail_w >= 720.,
+                                                            cx,
+                                                        ))
+                                                        .child(self.notes_height_control(u, cx)),
                                                 ))
                                                 .child(self.editor(u, cx)),
                                         )

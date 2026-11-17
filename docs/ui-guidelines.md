@@ -123,3 +123,13 @@ Side panel (for example version history): on the right, 360 px, an opaque `bg_el
 - The inbox input and the board title stay outside the scroll area. The settings keep Back and search fixed; the category list scrolls separately.
 - Every directly referenced `IconName` variant must be loadable offline through `AppAssets`. The asset test checks the SVG data that is actually loaded.
 - Test status and remaining live acceptance: [Audit 1.1.0](ui-audit-1.1.0.md).
+
+## Sticky window and manual order
+
+- Manual update order is shared by the sticky window and the main list's Manual sort. Editing content must never change explicit ranks. New entries append once manual order has been established. Drag handles and an insertion line expose reordering; context menus offer move up/down without dragging.
+- Sticky cards keep a wrapping metadata line for status, progress, date, tags and version/release. Priority uses green/yellow/red plus one/two/three bars and a text tooltip; its colors remain independent of the accent and the status colors.
+- Sticky task rows reserve fixed leading and action slots. Long titles wrap within the remaining width, dates/tags sit below the title, and controls align with the first text line. Drag, menu actions and Alt+Up/Down share the task ordering logic.
+- Notes default to content height. The minimum height is adjustable per update and shared between windows. Empty notes must not reserve a large writing area. Short update lists do not stretch to push post-its down.
+- Sticky-only autostart creates the main window hidden. Revealing the main window is an explicit action and must preserve the popup's current data.
+
+- Sticky view options are available in the popup toolbar and General settings, with persistent completed-update visibility, card density and start view. Hiding completed entries never deletes or archives them, and the list offers a visible recovery action. Title-only cards retain metadata in tooltips. The last sticky selection is independent of the main window, and invalid or hidden startup targets fall back to the overview.

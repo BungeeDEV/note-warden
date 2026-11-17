@@ -1,5 +1,20 @@
 ## Unreleased
 
+## 1.2.2
+
+### Added
+* Sticky-Ansicht direkt im Notizzettel einstellen: erledigte Updates ausblenden, Karten mit Details oder nur mit Titel anzeigen und die Startansicht zwischen Übersicht und zuletzt geöffnetem Sticky-Update wählen. Die Optionen bleiben gespeichert und sind auch unter Einstellungen → Allgemein → Notizzettel erreichbar.
+* Ausgeblendete erledigte Updates lassen sich direkt in der Liste wieder anzeigen. Suche und manuelle Reihenfolge bleiben erhalten; bei fehlenden, archivierten oder ausgeblendeten zuletzt geöffneten Updates startet der Notizzettel mit der Übersicht.
+* Updates manuell sortieren: Drag & Drop im Notizzettel und in der Hauptliste unter „Filter & Ansicht → Sortieren nach → Manuell“. Beide Fenster teilen die gespeicherte Reihenfolge; Bearbeitungen ändern sie nicht. Das Kontextmenü bietet „Nach oben/unten verschieben“ als Alternative.
+* Notizfeld pro Update anpassen: „Automatisch“ passt zum Inhalt, „Kompakt“, „Normal“ und „Groß“ stellen die Mindesthöhe ein. Die Wahl bleibt gespeichert und gilt in beiden Fenstern.
+* Einstellungen → Windows: „Nur Sticky Mode beim Windows-Start“ öffnet beim Autostart nur den Notizzettel. Das Hauptfenster bleibt verborgen und lässt sich über den Notizzettel oder Tray öffnen.
+
+### Changed
+* Notizzettel-Karten zeigen Status, Termin, Aufgabenfortschritt, Version beziehungsweise Release und Priorität. Datum, Version und Priorität lassen sich direkt im Notizzettel bearbeiten.
+* Aufgaben im Sticky Mode mit ausgerichteten Bedienelementen, mehrzeiligen Titeln, separaten Metadaten und Sortiergriffen. Reihenfolge auch über das Aufgabenmenü oder Alt+↑/↓ ändern.
+* Prioritäten in beiden Themes: Grün für niedrig, Gelb für mittel und Rot für hoch; die Anzahl der Balken und Tooltips zeigen zusätzlich die Stufe.
+* Leere Notizen brauchen weniger Platz. Die Post-its folgen direkt auf kurze Update-Listen, statt durch einen großen Leerraum getrennt zu sein.
+
 ## 1.2.1
 
 ### Added

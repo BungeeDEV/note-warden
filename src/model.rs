@@ -133,6 +133,12 @@ pub struct Task {
 
 #[derive(Clone, Deserialize, Serialize)]
 pub struct Update {
+    /// Explicit list position; absent in workspaces created before manual sorting.
+    #[serde(default)]
+    pub manual_order: Option<usize>,
+    /// Minimum editor height for this update (0 = fit content).
+    #[serde(default)]
+    pub notes_height: u16,
     #[serde(default)]
     pub tags: Vec<String>,
     #[serde(default)]
@@ -513,6 +519,8 @@ pub struct Settings {
     // System
     #[serde(default)]
     pub autostart: bool,
+    #[serde(default)]
+    pub autostart_sticky: bool,
     #[serde(default = "yes")]
     pub tray_on_close: bool,
     #[serde(default)]
@@ -846,7 +854,19 @@ impl Workspace {
 
     pub fn new_update(&mut self, date: Option<NaiveDate>) -> u64 {
         let id = self.next_id();
+        let manual_order = self
+            .updates
+            .iter()
+            .filter_map(|u| u.manual_order)
+            .max()
+            .and_then(|n| n.checked_add(1))
+            .or_else(|| {
+                (self.settings.updates_ui.sort == crate::SortKey::Manual)
+                    .then_some(self.updates.len())
+            });
         self.updates.push(Update {
+            manual_order,
+            notes_height: 0,
             tags: Vec::new(),
             version: String::new(),
             created_at: now_millis(),
@@ -921,6 +941,12 @@ impl Workspace {
     pub fn duplicate(&mut self, id: u64) -> Option<u64> {
         let mut copy = self.update(id)?.clone();
         copy.id = self.next_id();
+        copy.manual_order = self
+            .updates
+            .iter()
+            .filter_map(|u| u.manual_order)
+            .max()
+            .and_then(|n| n.checked_add(1));
         copy.title = format!("{} (Kopie)", copy.title);
         copy.planned_for = None;
         copy.release = None;
@@ -946,6 +972,47 @@ impl Workspace {
 
     pub fn update(&self, id: u64) -> Option<&Update> {
         self.updates.iter().find(|update| update.id == id)
+    }
+
+    /// Unranked entries retain the old newest-first ordering, after ranked entries.
+    pub fn manual_updates(&self) -> Vec<&Update> {
+        let mut updates: Vec<_> = self.updates.iter().collect();
+        updates.sort_by_key(|u| {
+            (
+                u.manual_order.unwrap_or(usize::MAX),
+                std::cmp::Reverse((u.edited_at, u.id)),
+            )
+        });
+        updates
+    }
+
+    /// Freeze the current order before entering a manual view, including legacy entries.
+    pub fn ensure_manual_order(&mut self) {
+        let ids: Vec<_> = self.manual_updates().iter().map(|u| u.id).collect();
+        for (position, id) in ids.into_iter().enumerate() {
+            self.update_mut(id).unwrap().manual_order = Some(position);
+        }
+    }
+
+    /// Reorders without changing edit timestamps. Hidden entries keep their relative order.
+    pub fn move_update(&mut self, id: u64, before: Option<u64>) -> bool {
+        if Some(id) == before
+            || !self.update(id).is_some_and(Update::is_live)
+            || before.is_some_and(|b| !self.update(b).is_some_and(Update::is_live))
+        {
+            return false;
+        }
+        let mut ids: Vec<_> = self.manual_updates().iter().map(|u| u.id).collect();
+        let from = ids.iter().position(|&i| i == id).unwrap();
+        ids.remove(from);
+        let to = before
+            .and_then(|b| ids.iter().position(|&i| i == b))
+            .unwrap_or(ids.len());
+        ids.insert(to, id);
+        for (position, id) in ids.into_iter().enumerate() {
+            self.update_mut(id).unwrap().manual_order = Some(position);
+        }
+        true
     }
 
     pub fn update_mut(&mut self, id: u64) -> Option<&mut Update> {
@@ -1225,6 +1292,51 @@ mod tests {
         let copy = ws.update(copy).unwrap();
         assert!(copy.planned_for.is_none());
         assert!(copy.tasks[0].planned_for.is_none() && !copy.tasks[0].done);
+    }
+
+    #[test]
+    fn manual_update_order_survives_edits_new_entries_and_reload() {
+        let mut ws = Workspace::default();
+        let a = ws.new_update(None);
+        let b = ws.new_update(None);
+        let c = ws.new_update(None);
+        let ids = |ws: &Workspace| ws.manual_updates().iter().map(|u| u.id).collect::<Vec<_>>();
+        assert_eq!(ids(&ws), vec![c, b, a]);
+        let edited = ws.update(a).unwrap().edited_at;
+        assert!(ws.move_update(a, Some(c)));
+        assert_eq!(ids(&ws), vec![a, c, b]);
+        assert_eq!(ws.update(a).unwrap().edited_at, edited);
+        ws.update_mut(b).unwrap().edited_at = i64::MAX;
+        ws.update_mut(a).unwrap().notes_height = 120;
+        assert_eq!(ids(&ws), vec![a, c, b]);
+        let d = ws.new_update(None);
+        assert_eq!(ids(&ws), vec![a, c, b, d]);
+        assert!(ws.move_update(a, None));
+        assert_eq!(ids(&ws), vec![c, b, d, a]);
+        let loaded: Workspace = serde_json::from_str(&serde_json::to_string(&ws).unwrap()).unwrap();
+        assert_eq!(ids(&loaded), ids(&ws));
+        assert_eq!(loaded.update(a).unwrap().notes_height, 120);
+        assert!(!ws.move_update(a, Some(a)));
+        assert!(!ws.move_update(999, Some(a)));
+        assert!(!ws.move_update(a, Some(999)));
+        ws.update_mut(c).unwrap().archived = true;
+        assert!(!ws.move_update(c, Some(a)));
+        assert!(!ws.move_update(a, Some(c)));
+    }
+
+    #[test]
+    fn old_updates_default_to_content_height_and_legacy_order() {
+        let ws: Workspace = serde_json::from_str(r#"{"updates":[{"id":1,"title":"A","edited_at":10},{"id":2,"title":"B","edited_at":20}]}"#).unwrap();
+        assert!(
+            ws.updates
+                .iter()
+                .all(|u| u.manual_order.is_none() && u.notes_height == 0)
+        );
+        assert_eq!(
+            ws.manual_updates().iter().map(|u| u.id).collect::<Vec<_>>(),
+            vec![2, 1]
+        );
+        assert!(!ws.settings.autostart_sticky);
     }
 
     #[test]

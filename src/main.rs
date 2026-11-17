@@ -125,10 +125,12 @@ pub enum SortKey {
     Status,
     Title,
     Priority,
+    Manual,
 }
 
 impl SortKey {
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 6] = [
+        Self::Manual,
         Self::Edited,
         Self::Date,
         Self::Status,
@@ -142,6 +144,7 @@ impl SortKey {
             Self::Status => "Status",
             Self::Title => "Titel A–Z",
             Self::Priority => "Priorität",
+            Self::Manual => "Manuell · Drag & Drop",
         }
     }
 }
@@ -573,12 +576,20 @@ impl NoteWarden {
         if std::env::args().any(|arg| arg == "--compact") {
             workspace.settings.compact.enabled = true;
         }
-        let selected_update = workspace
-            .updates
-            .iter()
-            .rev()
-            .find(|u| u.is_live())
-            .map(|u| u.id);
+        let sticky_restored_update = popup_of.as_ref().and_then(|_| {
+            workspace
+                .settings
+                .compact
+                .restored_update(&workspace.updates)
+        });
+        let selected_update = sticky_restored_update.or_else(|| {
+            workspace
+                .updates
+                .iter()
+                .rev()
+                .find(|u| u.is_live())
+                .map(|u| u.id)
+        });
         let today = model::today();
         let title_input = cx.new(|cx| {
             TextareaState::new(window, cx)
@@ -587,7 +598,7 @@ impl NoteWarden {
         });
         let notes_input = cx.new(|cx| {
             TextareaState::new(window, cx)
-                .auto_grow(7, 10000)
+                .auto_grow(1, 10000)
                 .placeholder("Notizen in Markdown …")
         });
         let search_input = cx.new(|cx| InputState::new(window, cx).placeholder("Suchen …"));
@@ -878,7 +889,7 @@ impl NoteWarden {
             sticky_input,
             editing_sticky: None,
             sticky_tag: None,
-            compact_list: true,
+            compact_list: sticky_restored_update.is_none(),
             compact_preview: false,
             popup: popup_of.is_some(),
             peer: popup_of.as_ref().map(|i| (i.main.clone(), i.main_window)),
@@ -1044,11 +1055,6 @@ impl NoteWarden {
             app.start_backups(cx);
             app.start_system(window, cx);
             app.start_splash(cx);
-            let reopen = app.workspace.settings.compact.enabled
-                || std::env::args().any(|arg| arg == "--compact");
-            if reopen {
-                cx.defer_in(window, |this, window, cx| this.open_popup(window, cx));
-            }
         }
         app._subscriptions.push(sticky_sub);
         app._subscriptions.push(tag_sub);
@@ -1083,6 +1089,9 @@ impl NoteWarden {
 
     /// Start view, calendar default and remembered layout values from the settings.
     fn apply_startup_settings(&mut self) {
+        if self.popup {
+            return;
+        }
         let st = &self.workspace.settings;
         self.cal_mode = match st.cal_view {
             model::CalView::Month => CalMode::Month,
@@ -1110,8 +1119,6 @@ impl NoteWarden {
 
     /// Tray behavior, hotkey, event channel and reminders.
     fn start_system(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let st = &self.workspace.settings;
-        let tray_mode = st.tray_on_close && st.reminders_on;
         window.on_window_should_close(cx, {
             let entity = cx.entity();
             move |_, cx| {
@@ -1174,17 +1181,16 @@ impl NoteWarden {
                 self.hotkey_error = Some("Dieses Kürzel ist ungültig.")
             }
         }
-        if self.workspace.settings.autostart != system::autostart_enabled() {
-            let _ = system::set_autostart(self.workspace.settings.autostart);
-        }
-        if tray_mode && std::env::args().any(|arg| arg == "--minimized") {
-            cx.spawn(async move |_, cx| {
-                cx.background_executor()
-                    .timer(StdDuration::from_millis(400))
-                    .await;
-                system::hide_main_window();
-            })
-            .detach();
+        if std::env::var_os("NOTE_WARDEN_DATA_DIR").is_none()
+            && !system::autostart_matches(
+                self.workspace.settings.autostart,
+                self.workspace.settings.autostart_sticky,
+            )
+        {
+            let _ = system::set_autostart(
+                self.workspace.settings.autostart,
+                self.workspace.settings.autostart_sticky,
+            );
         }
         self.schedule_reminders(cx);
         let last = self.workspace.settings.last_update_check.unwrap_or(0);
@@ -1492,6 +1498,8 @@ impl NoteWarden {
         if self.workspace.update(id).is_some() {
             if self.popup {
                 self.compact_list = false;
+                self.workspace.settings.compact.last_update = Some(id);
+                self.persist(cx);
             }
             self.selected_update = Some(id);
             if self.workspace.settings.last_update != Some(id) {
@@ -1862,6 +1870,9 @@ impl NoteWarden {
         before: Option<u64>,
         cx: &mut Context<Self>,
     ) {
+        if !self.writable {
+            return;
+        }
         let Some(update) = self.workspace.update_mut(update_id) else {
             return;
         };
@@ -2829,7 +2840,9 @@ fn main() {
         return;
     }
     log::init(&storage::data_dir(&storage::data_path()));
-    system::register_app_id(&storage::data_dir(&storage::data_path()));
+    if std::env::var_os("NOTE_WARDEN_DATA_DIR").is_none() {
+        system::register_app_id(&storage::data_dir(&storage::data_path()));
+    }
     log::install_panic_hook();
     log::info(&format!("Start {VERSION}"));
     gpui_kit::application().with_assets(AppAssets).run(|cx| {
@@ -2927,8 +2940,12 @@ fn main() {
                 .filter(|(w, h)| (960. ..=2560.).contains(w) && (620. ..=1600.).contains(h)))
             .unwrap_or((1280., 800.));
         let bounds = Bounds::centered(None, size(px(width), px(height)), cx);
-        gpui_kit::open_window(
+        // Create the owner window hidden, so autostart never flashes the full UI.
+        let hidden = std::env::args().any(|arg| arg == "--minimized" || arg == "--compact");
+        let (handle, main) = gpui_kit::open_window(
             WindowOptions {
+                show: !hidden,
+                focus: !hidden,
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
                 titlebar: Some(TitlebarOptions {
                     title: Some("Note Warden".into()),
@@ -2941,6 +2958,18 @@ fn main() {
             |window, cx| cx.new(|cx| NoteWarden::new(window, Some(events), None, cx)),
         )
         .expect("Fenster konnte nicht geöffnet werden");
+        let reopen = std::env::args().any(|arg| arg == "--compact")
+            || (main.read(cx).workspace.settings.compact.enabled
+                && !std::env::args().any(|arg| arg == "--minimized"));
+        if reopen {
+            // The owner must be installed before opening another window. In particular,
+            // a hidden owner has no first frame to retry a deferred window update.
+            cx.defer(move |cx| {
+                let _ = handle.update(cx, |_, window, cx| {
+                    main.update(cx, |main, cx| main.open_popup(window, cx));
+                });
+            });
+        }
     });
 }
 

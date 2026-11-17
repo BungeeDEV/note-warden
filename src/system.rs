@@ -195,17 +195,28 @@ fn main_window() -> Option<windows_sys::Win32::Foundation::HWND> {
 
 pub fn show_main_window() {
     if let Some(hwnd) = main_window() {
-        unsafe {
-            ShowWindow(
-                hwnd,
-                if IsIconic(hwnd) != 0 {
-                    SW_RESTORE
-                } else {
-                    SW_SHOW
-                },
-            );
-            SetForegroundWindow(hwnd);
-        }
+        show_hwnd(hwnd);
+    }
+}
+
+/// Reveal the exact owner of a popup, including an owner created with `show: false`.
+pub fn show_window(window: &gpui_kit::Window) {
+    if let Some(hwnd) = native_handle(window) {
+        show_hwnd(hwnd);
+    }
+}
+
+fn show_hwnd(hwnd: windows_sys::Win32::Foundation::HWND) {
+    unsafe {
+        ShowWindow(
+            hwnd,
+            if IsIconic(hwnd) != 0 {
+                SW_RESTORE
+            } else {
+                SW_SHOW
+            },
+        );
+        SetForegroundWindow(hwnd);
     }
 }
 
@@ -338,13 +349,34 @@ pub fn autostart_enabled() -> bool {
         .is_ok()
 }
 
-/// Start minimized in the tray when Windows starts.
-pub fn set_autostart(on: bool) -> std::io::Result<()> {
+fn autostart_command(exe: &Path, sticky: bool) -> String {
+    format!(
+        "\"{}\" {}",
+        exe.display(),
+        if sticky { "--compact" } else { "--minimized" }
+    )
+}
+
+pub fn autostart_matches(on: bool, sticky: bool) -> bool {
+    if !on {
+        return !autostart_enabled();
+    }
+    let Ok(exe) = std::env::current_exe() else {
+        return false;
+    };
+    winreg::RegKey::predef(winreg::enums::HKEY_CURRENT_USER)
+        .open_subkey(RUN_KEY)
+        .and_then(|key| key.get_value::<String, _>("NoteWarden"))
+        .is_ok_and(|value| value == autostart_command(&exe, sticky))
+}
+
+/// Start in the tray or with only the sticky window when Windows starts.
+pub fn set_autostart(on: bool, sticky: bool) -> std::io::Result<()> {
     let (key, _) =
         winreg::RegKey::predef(winreg::enums::HKEY_CURRENT_USER).create_subkey(RUN_KEY)?;
     if on {
         let exe = std::env::current_exe()?;
-        key.set_value("NoteWarden", &format!("\"{}\" --minimized", exe.display()))
+        key.set_value("NoteWarden", &autostart_command(&exe, sticky))
     } else {
         match key.delete_value("NoteWarden") {
             Err(error) if error.kind() != std::io::ErrorKind::NotFound => Err(error),
@@ -397,4 +429,22 @@ pub fn notify(title: &str, body: &str, target: Option<Target>) -> bool {
         })
         .show()
         .is_ok()
+}
+
+#[cfg(test)]
+mod startup_tests {
+    use super::*;
+
+    #[test]
+    fn startup_commands_quote_paths_and_select_one_start_mode() {
+        let exe = Path::new(r"C:\Program Files\Note Warden\Note Warden.exe");
+        assert_eq!(
+            autostart_command(exe, true),
+            r#""C:\Program Files\Note Warden\Note Warden.exe" --compact"#
+        );
+        assert_eq!(
+            autostart_command(exe, false),
+            r#""C:\Program Files\Note Warden\Note Warden.exe" --minimized"#
+        );
+    }
 }
