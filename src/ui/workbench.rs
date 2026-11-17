@@ -600,28 +600,37 @@ impl NoteWarden {
                                 false,
                                 click(Box::new(move |a, cx| {
                                     a.sort = key;
+                                    if key == SortKey::Manual {
+                                        if a.writable {
+                                            a.workspace.ensure_manual_order();
+                                        }
+                                        a.group = GroupBy::None;
+                                        a.workspace.settings.updates_ui.reverse = false;
+                                    }
                                     a.save_updates_ui(cx);
                                 })),
                             )
                         }))
-                        .child(div().mt(px(palette::SP_1)).child(kit::segment(
-                            "sort-dir",
-                            &p,
-                            &[(None, "Aufsteigend"), (None, "Absteigend")],
-                            usize::from(!ui.reverse),
-                            true,
-                            {
-                                let (app, pop) = (app.clone(), pop.clone());
-                                move |i, _, cx| {
-                                    app.update(cx, |a, cx| {
-                                        a.workspace.settings.updates_ui.reverse = i == 0;
-                                        a.persist(cx);
-                                        cx.notify();
-                                    });
-                                    pop.update(cx, |_, cx| cx.notify());
-                                }
-                            },
-                        ))),
+                        .when(sort != SortKey::Manual, |d| {
+                            d.child(div().mt(px(palette::SP_1)).child(kit::segment(
+                                "sort-dir",
+                                &p,
+                                &[(None, "Aufsteigend"), (None, "Absteigend")],
+                                usize::from(!ui.reverse),
+                                true,
+                                {
+                                    let (app, pop) = (app.clone(), pop.clone());
+                                    move |i, _, cx| {
+                                        app.update(cx, |a, cx| {
+                                            a.workspace.settings.updates_ui.reverse = i == 0;
+                                            a.persist(cx);
+                                            cx.notify();
+                                        });
+                                        pop.update(cx, |_, cx| cx.notify());
+                                    }
+                                },
+                            )))
+                        }),
                 );
                 body = body.child(
                     div()

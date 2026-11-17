@@ -4,7 +4,7 @@
 [![CodeQL](https://github.com/BungeeDEV/note-warden/actions/workflows/codeql.yml/badge.svg)](https://github.com/BungeeDEV/note-warden/actions/workflows/codeql.yml)
 [![Release](https://img.shields.io/github/v/release/BungeeDEV/note-warden)](https://github.com/BungeeDEV/note-warden/releases/latest)
 
-Note Warden is a local Windows desktop app for planning updates. An update has a status, Markdown notes, tasks (with subtasks) and dates; updates and tasks can be scheduled individually. Version `1.2.1`, see [CHANGELOG.md](CHANGELOG.md) for changes.
+Note Warden is a local Windows desktop app for planning updates. An update has a status, Markdown notes, tasks (with subtasks) and dates; updates and tasks can be scheduled individually. Version `1.2.2`, see [CHANGELOG.md](CHANGELOG.md) for changes.
 
 The app's interface is currently in German. Interface labels are quoted in German in this document, with the English meaning in parentheses.
 
@@ -27,6 +27,12 @@ Views: **Heute** (Today), **Inbox**, **Updates** (search, sorting, grouping, fil
 The **Notizzettel** (sticky notes window) is a small frameless window that stays open next to the main window. It shows your updates as cards with a post-it board below, and offers search, the editor and tasks. Open it with `Ctrl+Shift+M`, from the sidebar, the tray menu or the command palette; both windows keep their changes in sync.
 
 Tags can be added to updates, their tasks (`#tag` in the task field) and post-its (`#tag` in the text). They appear as colored chips, form a **Tags** section in the sidebar, work as a filter and are found by the search.
+
+The sticky window supports dragging updates and tasks into your preferred order. The main update list shares that order when **Filter & Ansicht → Sortieren nach → Manuell** (Filter & View → Sort by → Manual) is selected. Context menus also offer move up/down actions. Sticky cards show dates, task progress, priority and version/release information. Each update's **Notizen** (Notes) menu selects an automatic content height or a compact, normal or large minimum editor height, shared by both windows.
+
+The sticky toolbar's **Sticky-Ansicht einstellen** (Sticky View Options) menu controls completed-update visibility, detailed versus title-only cards, and whether opening the window shows the overview or the last update opened in the sticky window. These preferences are also available under **Einstellungen → Allgemein → Notizzettel** (Settings → General → Sticky Notes). The last sticky update is independent of the main window's selection; missing, archived, trashed or hidden completed entries fall back to the overview. Hidden completed updates can be shown again directly in the list. Title-only cards keep the full metadata in their tooltips.
+
+Under **Einstellungen → Windows** (Settings → Windows), enable **Beim Windows-Start starten** and **Nur Sticky Mode beim Windows-Start** to open only the sticky window at sign-in. The main window is created hidden and can be opened from the sticky window or tray. Without the sticky option, autostart stays in the tray. `--compact` and `--minimized` select these modes from the command line.
 
 Keyboard shortcuts (`?` shows the complete list): `Ctrl+N` new update, `Ctrl+K` command palette, `Ctrl+,` settings, `N` new entry in Today, `Ctrl+B` sidebar (bold inside the editor), `Ctrl+F` search, `Ctrl+1/2/3` Today/Updates/Board, `Ctrl+Shift+M` sticky notes window, `Space` mark the selected update done, `Del` delete an update (with undo), `Esc` closes dialogs. In the editor: `Ctrl+I` italic, `Ctrl+Shift+K` link, `Tab`/`Shift+Tab` indent/outdent lists.
 

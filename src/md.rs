@@ -672,6 +672,8 @@ mod tests {
             remind: Default::default(),
         };
         Update {
+            manual_order: None,
+            notes_height: 0,
             tags: Vec::new(),
             version: String::new(),
             created_at: 0,

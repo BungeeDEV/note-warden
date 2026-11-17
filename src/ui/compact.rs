@@ -1,8 +1,78 @@
 //! A small presentation of the same updates, editor, tasks and autosave pipeline.
+use super::list::update_menu;
 use super::*;
+use crate::compact::StickyStartView;
 use gpui_kit::component::input::Textarea;
+use gpui_kit::component::menu::{ContextMenuExt as _, DropdownMenu as _, PopupMenuItem};
 
 impl NoteWarden {
+    fn compact_view_options(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let prefs = &self.workspace.settings.compact;
+        let hide = prefs.hide_completed;
+        let compact = prefs.compact_cards;
+        let start_view = prefs.start_view;
+        let entity = cx.entity();
+        icon_btn(
+            "compact-view-options",
+            icons::FILTER,
+            "Sticky-Ansicht einstellen",
+        )
+        .toggled(hide || compact)
+        .disabled(!self.writable)
+        .dropdown_menu(move |menu, window, cx| {
+            let toggle = entity.clone();
+            let density = entity.clone();
+            let start = entity.clone();
+            menu.item(
+                PopupMenuItem::new("Erledigte Updates ausblenden")
+                    .checked(hide)
+                    .on_click(move |_, _, cx| {
+                        toggle.update(cx, |app, cx| {
+                            app.update_settings(cx, |s| {
+                                s.compact.hide_completed = !s.compact.hide_completed
+                            })
+                        })
+                    }),
+            )
+            .separator()
+            .submenu("Kartenansicht", window, cx, move |menu, _, _| {
+                [(false, "Mit Details"), (true, "Nur Titel")]
+                    .into_iter()
+                    .fold(menu, |menu, (value, label)| {
+                        let e = density.clone();
+                        menu.item(
+                            PopupMenuItem::new(label)
+                                .checked(value == compact)
+                                .on_click(move |_, _, cx| {
+                                    e.update(cx, |app, cx| {
+                                        app.update_settings(cx, |s| s.compact.compact_cards = value)
+                                    })
+                                }),
+                        )
+                    })
+            })
+            .submenu("Beim Öffnen", window, cx, move |menu, _, _| {
+                [
+                    (StickyStartView::Overview, "Übersicht"),
+                    (StickyStartView::LastUpdate, "Zuletzt geöffnetes Update"),
+                ]
+                .into_iter()
+                .fold(menu, |menu, (value, label)| {
+                    let e = start.clone();
+                    menu.item(
+                        PopupMenuItem::new(label)
+                            .checked(value == start_view)
+                            .on_click(move |_, _, cx| {
+                                e.update(cx, |app, cx| {
+                                    app.update_settings(cx, |s| s.compact.start_view = value)
+                                })
+                            }),
+                    )
+                })
+            })
+        })
+    }
+
     /// Opens the "Notizzettel" window next to the main window, or brings it to the front.
     pub fn open_popup(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.popup {
@@ -13,6 +83,9 @@ impl NoteWarden {
             return;
         }
         self.snapshot_pending();
+        if self.writable {
+            self.workspace.ensure_manual_order();
+        }
         self.workspace.settings.compact.enabled = true;
         let init = PopupInit {
             workspace: self.workspace.clone(),
@@ -119,6 +192,8 @@ impl NoteWarden {
         };
         let before = shown(self);
         self.workspace = workspace;
+        self.sort = self.workspace.settings.updates_ui.sort;
+        self.group = self.workspace.settings.updates_ui.group;
         if closing && !self.popup {
             self.popup_win = None;
             self.workspace.settings.compact.enabled = false;
@@ -153,8 +228,8 @@ impl NoteWarden {
         if self.peer_dirty {
             self.push_to_peer(cx, false);
         }
-        system::show_main_window();
         let _ = cx.update_window(handle, move |_, window, cx| {
+            system::show_window(window);
             if let Some(main) = main.upgrade() {
                 main.update(cx, |main, cx| f(main, window, cx));
             }
@@ -191,6 +266,7 @@ impl NoteWarden {
         );
         self.selected_update = Some(id);
         self.workspace.settings.last_update = Some(id);
+        self.workspace.settings.compact.last_update = Some(id);
         self.compact_list = false;
         self.compact_preview = false;
         self.editing_task = None;
@@ -278,6 +354,7 @@ impl NoteWarden {
                     },
                 ),
             )
+            .child(self.compact_view_options(cx))
             .child(
                 icon_btn("compact-close", icons::CLOSE, "Schließen")
                     .window_control_area(WindowControlArea::Close),
@@ -328,94 +405,19 @@ impl NoteWarden {
                         ))
                         .child(self.status_pill(update, cx)),
                 )
+                .child(
+                    div()
+                        .flex()
+                        .flex_wrap()
+                        .items_center()
+                        .gap(px(palette::SP_2))
+                        .child(self.date_prop_chip(update, cx))
+                        .child(self.priority_chip(id, update.priority, cx))
+                        .child(self.version_chip(update, cx)),
+                )
                 .child(self.tags_row(update, cx))
                 .child(self.editor(update, cx));
-            let (done, total) = update.task_progress();
-            content = content.child(
-                div()
-                    .pt(px(palette::SP_2))
-                    .border_t_1()
-                    .border_color(p.border_subtle)
-                    .text_size(palette::fs(palette::FS_BASE))
-                    .font_weight(FontWeight::MEDIUM)
-                    .child(format!("Aufgaben · {done}/{total}")),
-            );
-            for task in &update.tasks {
-                let tid = task.id;
-                let toggle = cx.entity();
-                let edit = cx.entity();
-                let remove = cx.entity();
-                let row = div()
-                    .flex()
-                    .items_start()
-                    .gap(px(palette::SP_2))
-                    .min_w_0()
-                    .when(task.sub, |d| d.pl(px(palette::SP_4)))
-                    .child(
-                        kit::task_checkbox(("compact-task-check", tid), &p, task.done)
-                            .disabled(!self.writable)
-                            .on_click(move |_, _, cx| {
-                                toggle.update(cx, |app, cx| app.toggle_task(id, tid, cx))
-                            }),
-                    )
-                    .child(if self.editing_task == Some(tid) {
-                        div()
-                            .flex_1()
-                            .min_w_0()
-                            .child(
-                                kit::input(&self.task_edit_input)
-                                    .aria_label("Aufgabe bearbeiten")
-                                    .w_full(),
-                            )
-                            .into_any_element()
-                    } else {
-                        kit::surface(("compact-task-title", tid), &p)
-                            .flex_1()
-                            .min_w_0()
-                            .min_h(px(palette::CTL_MD))
-                            .justify_start()
-                            .text_left()
-                            .when(task.done, |b| b.line_through().text_color(p.text_tertiary))
-                            .child(task.title.clone())
-                            .disabled(!self.writable)
-                            .on_click(move |_, window, cx| {
-                                edit.update(cx, |app, cx| app.start_task_edit(tid, window, cx))
-                            })
-                            .into_any_element()
-                    })
-                    .child(
-                        icon_btn(
-                            ("compact-task-delete", tid),
-                            icons::DELETE,
-                            "Aufgabe löschen",
-                        )
-                        .disabled(!self.writable)
-                        .on_click(move |_, _, cx| {
-                            remove.update(cx, |app, cx| app.delete_task(id, tid, cx))
-                        }),
-                    );
-                content = content.child(row);
-            }
-            let add = cx.entity();
-            content = content.child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap(px(palette::SP_2))
-                    .child(
-                        kit::input(&self.task_input)
-                            .aria_label("Aufgabe hinzufügen")
-                            .disabled(!self.writable)
-                            .w_full(),
-                    )
-                    .child(
-                        icon_btn("compact-task-add", icons::ADD, "Aufgabe hinzufügen · Enter")
-                            .disabled(!self.writable)
-                            .on_click(move |_, window, cx| {
-                                add.update(cx, |app, cx| app.add_task_from_input(window, cx))
-                            }),
-                    ),
-            );
+            content = content.child(self.task_section(update, cx));
         }
         div()
             .size_full()
@@ -461,9 +463,23 @@ impl NoteWarden {
 }
 
 impl NoteWarden {
-    /// Updates as slim cards on top, post-its below; each part scrolls on its own.
+    /// Updates and post-its share one scroll area, with no reserved empty sections.
     fn compact_list_body(&self, p: &Palette, cx: &mut Context<Self>) -> Div {
+        let accent = p.accent;
         let updates = compact_updates(&self.workspace, &self.search_query);
+        let compact = self.workspace.settings.compact.compact_cards;
+        let query = self.search_query.trim().to_lowercase();
+        let hidden_count = self
+            .workspace
+            .updates
+            .iter()
+            .filter(|u| {
+                self.workspace.settings.compact.hide_completed
+                    && u.is_live()
+                    && u.status == Status::Erledigt
+                    && matches_compact_query(u, &query)
+            })
+            .count();
         let stickies = self.visible_stickies(&self.search_query);
         let section = |label: &str, count: usize| {
             div()
@@ -486,7 +502,9 @@ impl NoteWarden {
         if updates.is_empty() {
             cards = cards.child(text_secondary(
                 p,
-                if self.search_query.is_empty() {
+                if hidden_count > 0 && self.search_query.is_empty() {
+                    "Alles erledigt · abgeschlossene Updates sind ausgeblendet"
+                } else if self.search_query.is_empty() {
                     "Noch keine Updates · mit + oben anlegen"
                 } else {
                     "Keine passenden Updates"
@@ -496,34 +514,106 @@ impl NoteWarden {
         for update in &updates {
             let id = update.id;
             let open = cx.entity();
-            let (done, total) = update.task_progress();
+            let meta = self.meta_parts(update, p);
+            let label = note_title(update);
             cards = cards.child(
                 kit::surface(("compact-note", id), p)
                     .w_full()
                     .min_w_0()
-                    .min_h(px(palette::CTL_LG + palette::SP_1))
+                    .min_h(px(if compact {
+                        palette::ROW_COMPACT
+                    } else {
+                        palette::CTL_LG + palette::SP_1
+                    }))
                     .px(px(palette::SP_3))
                     .rounded(px(palette::R_INPUT))
                     .border_1()
                     .border_color(p.border_subtle)
                     .bg(p.bg_panel)
+                    .py(px(if compact {
+                        palette::SP_1
+                    } else {
+                        palette::SP_2
+                    }))
                     .flex()
                     .items_center()
-                    .gap(px(palette::SP_3))
+                    .gap(px(palette::SP_2))
+                    .when(self.writable, |row| {
+                        row.on_drag(
+                            UpdateDrag {
+                                id,
+                                label: label.clone(),
+                            },
+                            |d, _, _, cx| {
+                                let label = d.label.clone();
+                                cx.new(|_| DragPreview { label })
+                            },
+                        )
+                        .drag_over::<UpdateDrag>(move |s, _, _, _| {
+                            s.border_t_2().border_color(accent)
+                        })
+                        .on_drop(cx.listener(
+                            move |app, d: &UpdateDrag, _, cx| {
+                                app.reorder_update(d.id, Some(id), cx);
+                            },
+                        ))
+                    })
+                    .child(div().flex_none().cursor_grab().child(
+                        kit::icon(icons::DRAG, palette::ICON_SM).text_color(p.text_tertiary),
+                    ))
                     .child(dot(p.status(update.status)))
                     .child(
                         div()
                             .flex_1()
                             .min_w_0()
-                            .truncate()
-                            .text_size(palette::fs(palette::FS_MD))
-                            .font_weight(FontWeight::MEDIUM)
-                            .child(note_title(update)),
+                            .flex()
+                            .flex_col()
+                            .gap(px(palette::SP_1))
+                            .child(
+                                div()
+                                    .truncate()
+                                    .text_size(palette::fs(palette::FS_MD))
+                                    .font_weight(FontWeight::MEDIUM)
+                                    .child(label),
+                            )
+                            .when(!compact, |d| {
+                                d.child(
+                                    kit::meta_line(p, {
+                                        let mut parts = vec![
+                                            div().child(update.status.label()).into_any_element(),
+                                        ];
+                                        parts.extend(meta);
+                                        if let Some(release) = &update.release {
+                                            parts.push(
+                                                div()
+                                                    .text_color(p.done)
+                                                    .child(format!("Release {}", release.version))
+                                                    .into_any_element(),
+                                            );
+                                        } else if !update.version.trim().is_empty() {
+                                            parts.push(
+                                                div()
+                                                    .child(format!("Version {}", update.version))
+                                                    .into_any_element(),
+                                            );
+                                        }
+                                        parts
+                                    })
+                                    .flex_wrap(),
+                                )
+                            }),
                     )
-                    .children(update.tags.iter().take(2).map(|tag| tags::tag_pill(p, tag)))
-                    .when(total > 0, |d| {
-                        d.child(text_secondary(p, format!("{done}/{total}")))
+                    .when(update.priority > 0, |d| {
+                        d.child(kit::priority_icon(
+                            ("compact-priority", id),
+                            p,
+                            update.priority,
+                        ))
                     })
+                    .tooltip(tip(compact_card_tooltip(
+                        update,
+                        self.workspace.settings.date_format,
+                    )))
                     .on_click(move |_, window, cx| {
                         open.update(cx, |app, cx| {
                             app.select_update(id, window, cx);
@@ -531,10 +621,68 @@ impl NoteWarden {
                             app.compact_preview = false;
                             cx.notify();
                         })
+                    })
+                    .context_menu({
+                        let build = update_menu(
+                            cx.entity(),
+                            id,
+                            false,
+                            false,
+                            false,
+                            update.release.is_some(),
+                        );
+                        move |m, w, cx| build(m, w, cx)
                     }),
             );
         }
+        cards = cards.child(
+            div()
+                .id("compact-update-end")
+                .h(px(palette::SP_3))
+                .border_t_2()
+                .border_color(gpui_kit::transparent_black())
+                .drag_over::<UpdateDrag>(move |s, _, _, _| s.border_color(accent))
+                .on_drop(
+                    cx.listener(|app, d: &UpdateDrag, _, cx| app.reorder_update(d.id, None, cx)),
+                ),
+        );
         let grid = self.sticky_grid(&stickies, 2, true, cx);
+        let post_header =
+            section("Post-its", stickies.len()).children(self.sticky_tag.clone().map(|tag| {
+                let clear = cx.entity();
+                let color = palette::tag_color(&tag, p);
+                let cleared = tag.clone();
+                kit::surface("sticky-tag-clear", p)
+                    .h(px(palette::CTL_SM))
+                    .px(px(palette::SP_2))
+                    .rounded_full()
+                    .bg(color.opacity(0.16))
+                    .text_color(color)
+                    .tooltip(tip("Filter aufheben"))
+                    .child(format!("#{tag} ×"))
+                    .on_click(move |_, _, cx| {
+                        cx.stop_propagation();
+                        clear.update(cx, |app, cx| app.toggle_sticky_tag(&cleared, cx))
+                    })
+            }));
+        let stack = div().w_full().min_w_0().flex().flex_col().gap(px(palette::SP_3))
+            .child(section("Updates", updates.len()).child(div().flex_1()).child(
+                div().id("compact-order-hint").text_size(palette::fs(palette::FS_SM))
+                    .tooltip(tip("Am Griff ziehen, um die Reihenfolge zu ändern. Weitere Aktionen per Rechtsklick."))
+                    .child("Manuell")))
+            .when(hidden_count > 0, |d| {
+                let show = cx.entity();
+                d.child(kit::button("compact-show-completed").ghost()
+                    .with_size(gpui_kit::component::Size::Small)
+                    .label(format!("{} · anzeigen", model::plural(hidden_count, "erledigtes Update", "erledigte Updates")))
+                    .accessibility_label("Erledigte Updates wieder anzeigen")
+                    .on_click(move |_, _, cx| show.update(cx, |app, cx| {
+                        app.update_settings(cx, |s| s.compact.hide_completed = false)
+                    })))
+            })
+            .child(cards)
+            .child(post_header)
+            .child(grid);
         div()
             .flex_1()
             .min_h_0()
@@ -548,43 +696,14 @@ impl NoteWarden {
                     .aria_label("Notizzettel suchen")
                     .w_full(),
             )
-            .child(section("Updates", updates.len()))
             .child(
                 div()
-                    .id("compact-updates")
+                    .id("compact-list-scroll")
                     .flex_1()
-                    .min_h(px(palette::CTL_LG))
+                    .min_h_0()
                     .overflow_y_scrollbar()
                     .pr(px(palette::SCROLL_GUTTER))
-                    .child(cards),
-            )
-            .child(
-                section("Post-its", stickies.len()).children(self.sticky_tag.clone().map(|tag| {
-                    let clear = cx.entity();
-                    let color = palette::tag_color(&tag, p);
-                    let cleared = tag.clone();
-                    kit::surface("sticky-tag-clear", p)
-                        .h(px(20.))
-                        .px(px(palette::SP_2))
-                        .rounded_full()
-                        .bg(color.opacity(0.16))
-                        .text_color(color)
-                        .tooltip(tip("Filter aufheben"))
-                        .child(format!("#{tag} ×"))
-                        .on_click(move |_, _, cx| {
-                            clear.update(cx, |app, cx| app.toggle_sticky_tag(&cleared, cx))
-                        })
-                })),
-            )
-            .child(
-                div()
-                    .id("compact-stickies")
-                    .flex_none()
-                    // About two rows of small notes; more scroll.
-                    .max_h(px(2. * 76. + palette::SP_2))
-                    .overflow_y_scrollbar()
-                    .pr(px(palette::SCROLL_GUTTER))
-                    .child(grid),
+                    .child(stack),
             )
     }
 }
@@ -595,26 +714,56 @@ fn note_title(update: &model::Update) -> String {
         .unwrap_or_else(|| "Neue Notiz".into())
 }
 
-fn compact_updates<'a>(workspace: &'a Workspace, query: &str) -> Vec<&'a model::Update> {
+pub(super) fn compact_updates<'a>(workspace: &'a Workspace, query: &str) -> Vec<&'a model::Update> {
     let query = query.trim().to_lowercase();
-    let mut updates: Vec<_> = workspace
-        .updates
-        .iter()
+    let updates: Vec<_> = workspace
+        .manual_updates()
+        .into_iter()
         .filter(|u| {
             u.is_live()
-                && (query.is_empty()
-                    || u.title.to_lowercase().contains(&query)
-                    || u.notes.to_lowercase().contains(&query)
-                    || u.tags
-                        .iter()
-                        .any(|t| t.to_lowercase().contains(query.trim_start_matches('#')))
-                    || u.tasks
-                        .iter()
-                        .any(|t| t.title.to_lowercase().contains(&query)))
+                && (!workspace.settings.compact.hide_completed || u.status != Status::Erledigt)
+                && matches_compact_query(u, &query)
         })
         .collect();
-    updates.sort_by_key(|u| (std::cmp::Reverse(u.edited_at), std::cmp::Reverse(u.id)));
     updates
+}
+
+fn matches_compact_query(update: &model::Update, query: &str) -> bool {
+    query.is_empty()
+        || update.title.to_lowercase().contains(query)
+        || update.notes.to_lowercase().contains(query)
+        || update
+            .tags
+            .iter()
+            .any(|t| t.to_lowercase().contains(query.trim_start_matches('#')))
+        || update
+            .tasks
+            .iter()
+            .any(|t| t.title.to_lowercase().contains(query))
+}
+
+fn compact_card_tooltip(update: &model::Update, format: model::DateFormat) -> String {
+    let mut parts = vec![note_title(update), update.status.label().to_owned()];
+    let (done, total) = update.task_progress();
+    if total > 0 {
+        parts.push(format!("{done}/{total} Aufgaben"));
+    }
+    if let Some(date) = update.planned_for {
+        parts.push(dates::full_with_weekday(date, format));
+    }
+    if let Some(release) = &update.release {
+        parts.push(format!("Release {}", release.version));
+    } else if !update.version.trim().is_empty() {
+        parts.push(format!("Version {}", update.version));
+    }
+    if update.priority > 0 {
+        parts.push(format!(
+            "Priorität: {}",
+            ["Keine", "Niedrig", "Mittel", "Hoch"][update.priority.min(3) as usize]
+        ));
+    }
+    parts.extend(update.tags.iter().map(|tag| format!("#{tag}")));
+    parts.join(" · ")
 }
 
 /// Window options for the popup: remembered size, remembered position if still on a monitor,
@@ -668,5 +817,87 @@ mod tests {
         assert_eq!(compact_updates(&workspace, "VERÖFFENTLICHUNG")[0].id, id);
         workspace.update_mut(id).unwrap().archived = true;
         assert!(compact_updates(&workspace, "").is_empty());
+    }
+
+    #[::core::prelude::v1::test]
+    fn compact_search_preserves_manual_order() {
+        let mut ws = Workspace::default();
+        let a = ws.new_update(None);
+        let b = ws.new_update(None);
+        let c = ws.new_update(None);
+        for id in [a, b, c] {
+            ws.update_mut(id).unwrap().title = "Release".into();
+        }
+        ws.move_update(a, Some(c));
+        ws.update_mut(b).unwrap().archived = true;
+        assert_eq!(
+            compact_updates(&ws, "release")
+                .iter()
+                .map(|u| u.id)
+                .collect::<Vec<_>>(),
+            vec![a, c]
+        );
+        ws.update_mut(c).unwrap().touch();
+        assert_eq!(
+            compact_updates(&ws, "")
+                .iter()
+                .map(|u| u.id)
+                .collect::<Vec<_>>(),
+            vec![a, c]
+        );
+    }
+
+    #[::core::prelude::v1::test]
+    fn hiding_completed_preserves_search_order_and_workspace_entries() {
+        let mut ws = Workspace::default();
+        let a = ws.new_update(None);
+        let b = ws.new_update(None);
+        let archived = ws.new_update(None);
+        for id in [a, b, archived] {
+            ws.update_mut(id).unwrap().title = "Release".into();
+        }
+        ws.update_mut(b).unwrap().status = Status::Erledigt;
+        ws.update_mut(archived).unwrap().archived = true;
+        ws.move_update(a, Some(b));
+        let ids = |ws: &Workspace, query| {
+            compact_updates(ws, query)
+                .iter()
+                .map(|u| u.id)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(ids(&ws, "Release"), vec![a, b]);
+        ws.settings.compact.hide_completed = true;
+        assert_eq!(ids(&ws, "RELEASE"), vec![a]);
+        assert!(ids(&ws, "missing").is_empty());
+        assert_eq!(ws.updates.len(), 3);
+        ws.update_mut(a).unwrap().status = Status::Erledigt;
+        assert!(ids(&ws, "").is_empty());
+        ws.settings.compact.hide_completed = false;
+        assert_eq!(ids(&ws, ""), vec![a, b]);
+        ws.settings.compact.hide_completed = true;
+        ws.update_mut(b).unwrap().status = Status::InArbeit;
+        assert_eq!(ids(&ws, ""), vec![b]);
+    }
+
+    #[::core::prelude::v1::test]
+    fn compact_tooltips_keep_hidden_card_metadata() {
+        let mut ws = Workspace::default();
+        let id = ws.new_update(Some(model::today()));
+        let update = ws.update_mut(id).unwrap();
+        update.title = "Release planen".into();
+        update.version = "1.2.2".into();
+        update.priority = 3;
+        update.tags.push("Server".into());
+        let text = compact_card_tooltip(update, Default::default());
+        for expected in [
+            "Release planen",
+            "Geplant",
+            "Version 1.2.2",
+            "Priorität: Hoch",
+            "#Server",
+        ] {
+            assert!(text.contains(expected));
+        }
+        assert!(!text.contains("0/0"));
     }
 }

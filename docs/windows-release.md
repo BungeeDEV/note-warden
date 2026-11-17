@@ -2,11 +2,13 @@
 
 ## Current state
 
-**Version 1.1.0 is published:** [release](https://github.com/BungeeDEV/note-warden/releases/tag/v1.1.0) · [Windows setup](https://github.com/BungeeDEV/note-warden/releases/download/v1.1.0/NoteWarden-1.1.0-setup.exe). The [final CI run](https://github.com/BungeeDEV/note-warden/actions/runs/43859880740) passed formatting, Clippy, 37 tests, the official Minisign verification, the setup build, first install, reinstall and an uninstall that preserves data. After publication, the actual Rust updater successfully downloaded the public manifest and the installer and verified its signature.
+The current published version and Windows setup are available under [GitHub Releases](https://github.com/BungeeDEV/note-warden/releases/latest). Source versions are prepared separately from publication: merging a version change does not yet make an update available. The desktop acceptance record for the 1.2.2 Sticky Mode improvements is in [ui-audit-1.2.2.md](ui-audit-1.2.2.md).
+
+The release workflow builds and signs the Windows installer, tests first install/reinstall/uninstall with data retention on a fresh runner, then creates a draft. Before publishing, review the workflow result, release notes, artifact checksums and signature. After publication, verify that the public latest manifest and setup are downloadable and that the Rust updater accepts their signature.
 
 The public project and release repository is **[BungeeDEV/note-warden](https://github.com/BungeeDEV/note-warden)**. The user approved publishing the app's source code. Personal development data, working data and private keys are excluded; `.claude` points to personal development data and is not uploaded.
 
-The local setup compiler could not be installed because an automatic approval was denied. The reproducible installer build therefore runs on GitHub's `windows-2025` runner, which has Inno Setup. The workflow first creates a draft that is reviewed before publishing. The status is shown under [Actions](https://github.com/BungeeDEV/note-warden/actions).
+Local installer builds require Inno Setup. The reproducible GitHub installer build runs on a `windows-2025` runner, which has Inno Setup. Its draft is reviewed before publishing. The status is shown under [Actions](https://github.com/BungeeDEV/note-warden/actions).
 
 ## Normal release flow on GitHub
 

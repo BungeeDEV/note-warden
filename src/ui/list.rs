@@ -61,6 +61,12 @@ pub fn update_menu(
             .item(item("Datum setzen …", |app, id, window, cx| {
                 let pos = window.mouse_position();
                 app.open_date_pop(DateTarget::Update(id), pos, window, cx)
+            }))
+            .item(item("Nach oben verschieben", |app, id, _, cx| {
+                app.nudge_update(id, true, cx)
+            }))
+            .item(item("Nach unten verschieben", |app, id, _, cx| {
+                app.nudge_update(id, false, cx)
             }));
         if detail {
             menu = menu.item(item("Als Markdown exportieren …", |app, id, _, cx| {
@@ -95,6 +101,68 @@ enum Row<'a> {
 }
 
 impl NoteWarden {
+    pub(super) fn reorder_update(&mut self, id: u64, before: Option<u64>, cx: &mut Context<Self>) {
+        if !self.writable {
+            return;
+        }
+        self.snapshot_pending();
+        if self.workspace.move_update(id, before) {
+            self.sort = SortKey::Manual;
+            self.group = GroupBy::None;
+            self.workspace.settings.updates_ui.reverse = false;
+            self.save_updates_ui(cx);
+        }
+    }
+
+    pub(super) fn nudge_update(&mut self, id: u64, up: bool, cx: &mut Context<Self>) {
+        if !self.writable {
+            return;
+        }
+        let ids: Vec<_> = if self.popup {
+            super::compact::compact_updates(&self.workspace, &self.search_query)
+                .into_iter()
+                .map(|u| u.id)
+                .collect()
+        } else {
+            self.visible_updates()
+                .iter()
+                .filter(|u| u.is_live())
+                .map(|u| u.id)
+                .collect()
+        };
+        let Some(pos) = ids.iter().position(|&i| i == id) else {
+            return;
+        };
+        if (up && pos == 0) || (!up && pos + 1 >= ids.len()) {
+            return;
+        }
+        if !self.popup && self.sort != SortKey::Manual {
+            // Preserve the currently displayed order when a menu move switches modes.
+            let visible: std::collections::HashSet<_> = ids.iter().copied().collect();
+            let mut replacement = ids.iter().copied();
+            let ordered: Vec<_> = self
+                .workspace
+                .manual_updates()
+                .iter()
+                .map(|u| {
+                    if visible.contains(&u.id) {
+                        replacement.next().unwrap()
+                    } else {
+                        u.id
+                    }
+                })
+                .collect();
+            for (rank, id) in ordered.into_iter().enumerate() {
+                self.workspace.update_mut(id).unwrap().manual_order = Some(rank);
+            }
+        }
+        if up && pos > 0 {
+            self.reorder_update(id, Some(ids[pos - 1]), cx);
+        } else if !up && pos + 1 < ids.len() {
+            self.reorder_update(id, ids.get(pos + 2).copied(), cx);
+        }
+    }
+
     fn matches_query(update: &model::Update, query: &str) -> bool {
         query.is_empty()
             || fuzzy_matches(&update.title, query)
@@ -162,6 +230,14 @@ impl NoteWarden {
             })
             .collect();
         match self.sort {
+            SortKey::Manual => {
+                list.sort_by_key(|u| {
+                    (
+                        u.manual_order.unwrap_or(usize::MAX),
+                        std::cmp::Reverse((u.edited_at, u.id)),
+                    )
+                });
+            }
             SortKey::Edited => list.sort_by_key(|u| std::cmp::Reverse((u.edited_at, u.id))),
             SortKey::Date => list.sort_by_key(|u| (u.planned_for.is_none(), u.planned_for, u.id)),
             SortKey::Status => {
@@ -170,7 +246,7 @@ impl NoteWarden {
             SortKey::Priority => list.sort_by_key(|u| std::cmp::Reverse(u.priority)),
             SortKey::Title => list.sort_by_key(|u| u.title.to_lowercase()),
         }
-        if self.workspace.settings.updates_ui.reverse {
+        if self.workspace.settings.updates_ui.reverse && self.sort != SortKey::Manual {
             list.reverse();
         }
         list
@@ -446,10 +522,38 @@ impl NoteWarden {
                 }
                 parts.join(" · ")
             }))
+            .when(
+                self.writable && update.is_live() && self.sort == SortKey::Manual,
+                |row| {
+                    row.on_drag(
+                        UpdateDrag {
+                            id,
+                            label: update.display_title().unwrap_or_default(),
+                        },
+                        |d, _, _, cx| {
+                            let label = d.label.clone();
+                            cx.new(|_| DragPreview { label })
+                        },
+                    )
+                    .drag_over::<UpdateDrag>(move |s, _, _, _| {
+                        s.border_t_2().border_color(p.accent)
+                    })
+                    .on_drop(cx.listener(move |app, d: &UpdateDrag, _, cx| {
+                        app.reorder_update(d.id, Some(id), cx);
+                    }))
+                },
+            )
             .on_click(move |ev, w, cx| {
                 e.update(cx, |a, cx| {
                     a.click_card(id, ev.modifiers().control, ev.modifiers().shift, w, cx)
                 })
+            })
+            .when(self.sort == SortKey::Manual && update.is_live(), |row| {
+                row.child(
+                    div().flex_none().cursor_grab().child(
+                        kit::icon(icons::DRAG, palette::ICON_SM).text_color(p.text_tertiary),
+                    ),
+                )
             })
             .child(kit::row_leading(self.status_control(update, cx)))
             .child(if compact {
@@ -891,7 +995,28 @@ impl NoteWarden {
                             .track_scroll(&self.virtual_scroll)
                             .size_full(),
                         )
-                    }),
+                    })
+                    .when(
+                        self.sort == SortKey::Manual
+                            && self.writable
+                            && !matches!(filter, Filter::Trash | Filter::Archive),
+                        |d| {
+                            d.child(
+                                div()
+                                    .id("update-end-drop")
+                                    .flex_none()
+                                    .h(px(palette::SP_4))
+                                    .border_t_2()
+                                    .border_color(gpui_kit::transparent_black())
+                                    .drag_over::<UpdateDrag>(move |s, _, _, _| {
+                                        s.border_color(p.accent)
+                                    })
+                                    .on_drop(cx.listener(|app, d: &UpdateDrag, _, cx| {
+                                        app.reorder_update(d.id, None, cx)
+                                    })),
+                            )
+                        },
+                    ),
             )
             .when(!self.multi.is_empty(), |d| d.child(self.bulk_bar(cx)))
     }

@@ -167,17 +167,12 @@ impl Palette {
             dark_text
         };
         p.bg_active = if dark { c(0x292a30) } else { c(0xe8e8ed) };
-        // Priority bars: unfilled 3:1 against the hover surface, filled 3:1 against unfilled.
+        // Priority keeps its own traffic-light colors, independent of the accent.
         let toward_text = dark;
         p.prio_off = fit(p.border_strong, p.bg_hover, 3., toward_text);
-        p.prio_low = fit(p.text_secondary, p.prio_off, 3., toward_text);
-        p.prio_mid = fit(p.text_primary, p.prio_off, 3., toward_text);
-        p.prio_high = fit(
-            c(if dark { 0xfb923c } else { 0xea580c }),
-            p.prio_off,
-            3.,
-            toward_text,
-        );
+        p.prio_low = fit(p.prio_low, p.bg_hover, 4.5, toward_text);
+        p.prio_mid = fit(p.prio_mid, p.bg_hover, 4.5, toward_text);
+        p.prio_high = fit(p.prio_high, p.bg_hover, 4.5, toward_text);
         // Menus: hover clearly separated from the popover surface, border and dividers 3:1.
         p.bg_menu_hover = fit(p.bg_hover, p.bg_elevated, 1.25, dark);
         p.border_popover = fit(p.border_strong, p.bg_elevated, 3., dark);
@@ -211,9 +206,9 @@ impl Palette {
             done: c(0x4ade80),
             danger: c(0xf87171),
             prio_off: c(0x68686f),
-            prio_low: c(0xc6c6ce),
-            prio_mid: c(0xececee),
-            prio_high: c(0xfb923c),
+            prio_low: c(0x4ade80),
+            prio_mid: c(0xfacc15),
+            prio_high: c(0xf87171),
             bg_menu_hover: c(0x2d2f36),
             border_popover: c(0x6a6c74),
         }
@@ -244,9 +239,9 @@ impl Palette {
             done: c(0x15803d),
             danger: c(0xdc2626),
             prio_off: c(0x8c8c95),
-            prio_low: c(0x3f3f46),
-            prio_mid: c(0x18181b),
-            prio_high: c(0x9a3412),
+            prio_low: c(0x15803d),
+            prio_mid: c(0x946200),
+            prio_high: c(0xb91c1c),
             bg_menu_hover: c(0xe0e0e6),
             border_popover: c(0x8c8c95),
         }
