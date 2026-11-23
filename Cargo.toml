@@ -4,7 +4,7 @@ version = "1.2.2"
 edition = "2024"
 
 [dependencies]
-gpui-kit = "=0.9.1"
+gpui-kit = "=0.10.0"
 chrono = { version = "0.4", features = ["serde"] }
 directories = "6"
 serde = { version = "1", features = ["derive"] }
